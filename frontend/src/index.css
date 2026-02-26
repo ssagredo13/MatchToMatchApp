@@ -1,26 +1,42 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer components {
-  .btn-primary {
-    @apply bg-[#ccff00] text-black px-8 py-4 rounded-2xl font-black italic text-[11px] uppercase hover:scale-105 transition-all shadow-[0_0_25px_rgba(204,255,0,0.2)] disabled:opacity-20 disabled:cursor-not-allowed;
+/* Definición de componentes usando la nueva sintaxis v4 */
+@utility btn-primary {
+  @apply bg-[#ccff00] text-black px-8 py-4 rounded-2xl font-black italic text-[11px] uppercase transition-all shadow-[0_0_25px_rgba(204,255,0,0.2)] disabled:opacity-20 disabled:cursor-not-allowed;
+  &:hover {
+    @apply scale-105;
   }
-  
-  .glass-card {
-    @apply bg-slate-900/40 border border-white/5 rounded-[32px] hover:border-[#ccff00]/50 transition-all group cursor-pointer relative overflow-hidden;
-  }
+}
 
-  .nav-item {
-    @apply text-[10px] font-black uppercase italic tracking-[0.15em] text-slate-400 hover:text-[#ccff00] transition-colors cursor-pointer;
+@utility glass-card {
+  @apply bg-slate-900/40 border border-white/5 rounded-[32px] transition-all cursor-pointer relative overflow-hidden;
+  &:hover {
+    @apply border-[#ccff00]/50;
   }
+}
 
-  .input-dark {
-    @apply w-full bg-[#020617] border border-white/10 p-5 rounded-2xl text-white font-black italic outline-none focus:border-[#ccff00] transition-all;
+@utility nav-item {
+  @apply text-[10px] font-black uppercase italic tracking-[0.15em] text-slate-400 transition-colors cursor-pointer;
+  &:hover {
+    @apply text-[#ccff00];
   }
+}
 
-  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-[#ccff00]/20 rounded-full; }
+@utility input-dark {
+  @apply w-full bg-[#020617] border border-white/10 p-5 rounded-2xl text-white font-black italic outline-none transition-all;
+  &:focus {
+    @apply border-[#ccff00];
+  }
+}
+
+/* Scrollbar y Leaflet se mantienen como CSS estándar */
+.custom-scrollbar::-webkit-scrollbar { 
+  width: 4px; 
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+  background-color: rgba(204, 255, 0, 0.2);
+  border-radius: 9999px;
 }
 
 .leaflet-container {
