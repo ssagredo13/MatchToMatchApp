@@ -1,0 +1,38 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mtm-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: mtm-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=mach_to_match
+    depends_on:
+      - mongodb
+
+  frontend:
+    build: ./frontend
+    container_name: mtm-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
+  

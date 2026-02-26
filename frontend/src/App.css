@@ -1,0 +1,56 @@
+/* Estilos Base para el Dashboard */
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* El borde verde lima característico a la izquierda */
+.match-card {
+  position: relative;
+  background-color: #1e293b; /* slate-800 */
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: transform 0.2s ease-in-out;
+}
+
+.match-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(204, 255, 0, 0.1);
+}
+
+/* La franja lateral 'Electric Striker' */
+.match-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #CCFF00; /* Lime / Verde Eléctrico */
+  box-shadow: 2px 0 10px rgba(204, 255, 0, 0.4);
+}
+
+/* Utilidades para sombras de texto Neón */
+.text-shadow-glow {
+  text-shadow: 0 0 12px rgba(204, 255, 0, 0.6);
+}
+
+/* Contenedor de mapas de Leaflet (para Talca y proyección nacional) */
+.leaflet-container {
+  width: 100%;
+  height: 400px;
+  border-radius: 12px;
+  z-index: 10;
+  border: 1px solid #334155;
+}
+
+/* Estilos para botones sesgados (Skew) */
+.btn-skew {
+  transform: skewX(-15deg);
+}
+
+.btn-skew > span {
+  display: inline-block;
+  transform: skewX(15deg);
+}
