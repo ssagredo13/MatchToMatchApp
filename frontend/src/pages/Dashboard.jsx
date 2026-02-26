@@ -8,8 +8,9 @@ import Navbar from '../components/Navbar';
 import MatchCard from '../components/MatchCard';
 import MatchModals from '../components/MatchModals';
 
-const Dashboard = () => {
-  // --- ESTADOS (Se mantienen igual) ---
+// Recibimos user y onLogout como props desde App.jsx
+const Dashboard = ({ user, onLogout }) => {
+  // --- ESTADOS ---
   const [partidos, setPartidos] = useState(() => {
     const saved = localStorage.getItem('partidos_v_final');
     return saved ? JSON.parse(saved) : [
@@ -22,12 +23,7 @@ const Dashboard = () => {
     return saved ? JSON.parse(saved) : [{ id: 101, nombre: "TALCA UNITED FC" }];
   });
 
-  const [user] = useState({ 
-    name: "SEBASTIÁN S.", 
-    email: "ssagredo13@gmail.com", 
-    role: "PRO PLAYER", 
-    picture: "https://github.com/identicons/j.png"
-  });
+  // Eliminamos el useState de user que estaba aquí, ya que ahora viene por props
 
   const [filtro, setFiltro] = useState('TODOS');
   const [modalType, setModalType] = useState(null); 
@@ -38,14 +34,15 @@ const Dashboard = () => {
     equipoId: '', recinto: '', hora: '20:00', fecha: '', tipo: 'JUGADORES', requiereArquero: false, canchaConfirmada: false 
   });
 
-  const isAdmin = user.email === 'ssagredo13@gmail.com';
+  // Verificamos si es admin usando el email del usuario de Google
+  const isAdmin = user?.email === 'ssagredo13@gmail.com';
 
   useEffect(() => {
     localStorage.setItem('partidos_v_final', JSON.stringify(partidos));
     localStorage.setItem('mis_equipos_v_final', JSON.stringify(misEquipos));
   }, [partidos, misEquipos]);
 
-  // --- HANDLERS (Se mantienen igual) ---
+  // --- HANDLERS ---
   const handleCrearPartida = () => {
     if (!formPartida.equipoId) return; 
     const eq = misEquipos.find(e => e.id === Number(formPartida.equipoId));
@@ -83,12 +80,11 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00]">
       
-      <Navbar user={user} onLogout={() => console.log("Logout")} />
+      {/* Pasamos las props reales al Navbar */}
+      <Navbar user={user} onLogout={onLogout} />
 
-      {/* AJUSTE: max-w-7xl y px-6 para coincidir exactamente con el NavBar */}
       <main className="pt-32 px-6 max-w-7xl mx-auto pb-20">
         
-        {/* CABECERA: Más compacta y alineada */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
           <div className="space-y-1">
             <h2 className="text-[10px] font-black italic text-[#CCFF00] uppercase tracking-[0.4em]">Talca Hub</h2>
@@ -108,7 +104,6 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* FILTROS: Alineados al borde izquierdo del título */}
         <div className="flex gap-2 mb-10 overflow-x-auto pb-2 custom-scrollbar">
           {['TODOS', 'BUSCANDO JUGADORES', 'BUSCANDO RIVAL'].map(f => (
             <button 
@@ -125,10 +120,8 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* CUADRÍCULA PRINCIPAL */}
         <div className="grid grid-cols-12 gap-8 items-start">
           
-          {/* LISTADO: Altura fija con scroll interno para que el mapa no se mueva */}
           <div className="col-span-12 lg:col-span-5 space-y-4 max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
             {partidos
               .filter(p => filtro === 'TODOS' || p.estado === filtro)
@@ -143,10 +136,8 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* MAPA: Sticky para que siempre esté visible al bajar en la lista */}
           <div className="col-span-12 lg:col-span-7 h-[500px] lg:h-[700px] sticky top-28">
             <div className="h-full w-full border border-white/5 rounded-[32px] overflow-hidden shadow-2xl relative">
-              {/* Overlay decorativo para el mapa */}
               <div className="absolute top-4 right-4 z-[500] bg-[#020617]/80 backdrop-blur-md px-4 py-2 border border-white/10 rounded-full">
                 <p className="text-[9px] font-black italic text-[#CCFF00] uppercase tracking-widest">Live Talca Map</p>
               </div>
