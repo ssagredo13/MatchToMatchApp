@@ -8,13 +8,29 @@ import Navbar from '../components/Navbar';
 import MatchCard from '../components/MatchCard';
 import MatchModals from '../components/MatchModals';
 
-// Recibimos user y onLogout como props desde App.jsx
 const Dashboard = ({ user, onLogout }) => {
   // --- ESTADOS ---
   const [partidos, setPartidos] = useState(() => {
     const saved = localStorage.getItem('partidos_v_final');
+    // Agregamos jugadoresInscritos al partido inicial si no existe
     return saved ? JSON.parse(saved) : [
-      { id: 1, equipo: "TALCA UNITED", rival: null, cancha: "Estadio Fiscal", hora: "20:00", fecha: "2026-02-26", jugadores: 10, total: 12, estado: "BUSCANDO JUGADORES", tipo: "JUGADORES", lat: -35.4264, lng: -71.6554, requiereArquero: true, canchaConfirmada: true },
+      { 
+        id: 1, 
+        equipo: "TALCA UNITED", 
+        rival: null, 
+        cancha: "Estadio Fiscal", 
+        hora: "20:00", 
+        fecha: "2026-02-26", 
+        jugadores: 10, 
+        total: 12, 
+        estado: "BUSCANDO JUGADORES", 
+        tipo: "JUGADORES", 
+        lat: -35.4264, 
+        lng: -71.6554, 
+        requiereArquero: true, 
+        canchaConfirmada: true,
+        jugadoresInscritos: [] // Lista de emails de quienes se unieron
+      },
     ];
   });
 
@@ -22,8 +38,6 @@ const Dashboard = ({ user, onLogout }) => {
     const saved = localStorage.getItem('mis_equipos_v_final');
     return saved ? JSON.parse(saved) : [{ id: 101, nombre: "TALCA UNITED FC" }];
   });
-
-  // Eliminamos el useState de user que estaba aquí, ya que ahora viene por props
 
   const [filtro, setFiltro] = useState('TODOS');
   const [modalType, setModalType] = useState(null); 
@@ -34,7 +48,6 @@ const Dashboard = ({ user, onLogout }) => {
     equipoId: '', recinto: '', hora: '20:00', fecha: '', tipo: 'JUGADORES', requiereArquero: false, canchaConfirmada: false 
   });
 
-  // Verificamos si es admin usando el email del usuario de Google
   const isAdmin = user?.email === 'ssagredo13@gmail.com';
 
   useEffect(() => {
@@ -43,25 +56,61 @@ const Dashboard = ({ user, onLogout }) => {
   }, [partidos, misEquipos]);
 
   // --- HANDLERS ---
+  
   const handleCrearPartida = () => {
     if (!formPartida.equipoId) return; 
     const eq = misEquipos.find(e => e.id === Number(formPartida.equipoId));
+    
     const nueva = {
-      ...formPartida, id: Date.now(), equipo: eq?.nombre || "Sin Equipo", rival: null,
-      cancha: formPartida.recinto || "Por definir", jugadores: formPartida.tipo === 'RIVAL' ? 6 : 1,
-      total: 12, estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES',
-      lat: -35.4264 + (Math.random() * 0.01), lng: -71.6554 + (Math.random() * 0.01)
+      ...formPartida, 
+      id: Date.now(), 
+      equipo: eq?.nombre || "Sin Equipo", 
+      rival: null,
+      cancha: formPartida.recinto || "Por definir", 
+      jugadores: 1, 
+      // Al crearla, el usuario actual se inscribe automáticamente
+      jugadoresInscritos: [user.email], 
+      total: 12, 
+      estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES',
+      lat: -35.4264 + (Math.random() * 0.01), 
+      lng: -71.6554 + (Math.random() * 0.01)
     };
     setPartidos([nueva, ...partidos]);
     setModalType(null);
   };
 
   const handleUnirseMatch = (pId, mode, equipoData = null) => {
+    const partidoDestino = partidos.find(p => p.id === pId);
+
+    // VALIDACIÓN 1: ¿Ya estás en este partido?
+    if (mode === 'PLAYER' && partidoDestino.jugadoresInscritos?.includes(user.email)) {
+      alert("¡Ya estás inscrito en esta pichanga!");
+      return;
+    }
+
+    // VALIDACIÓN 2: ¿Choque de horario? (Mismo día y misma hora)
+    const choque = partidos.find(p => 
+      p.jugadoresInscritos?.includes(user.email) && 
+      p.fecha === partidoDestino.fecha && 
+      p.hora === partidoDestino.hora
+    );
+
+    if (choque) {
+      alert(`Error: Ya tienes un partido a esa misma hora en ${choque.cancha}`);
+      return;
+    }
+
     setPartidos(prev => prev.map(p => {
       if (p.id === pId) {
         if (mode === 'PLAYER') {
-          const nuevos = p.jugadores + 1;
-          return { ...p, jugadores: nuevos, estado: nuevos === p.total ? "COMPLETO" : p.estado };
+          const nuevosInscritos = [...(p.jugadoresInscritos || []), user.email];
+          const cantidad = nuevosInscritos.length;
+          return { 
+            ...p, 
+            jugadores: cantidad, 
+            jugadoresInscritos: nuevosInscritos,
+            estado: cantidad === p.total ? "COMPLETO" : p.estado 
+          };
         }
         return { ...p, rival: equipoData.nombre, jugadores: 12, estado: "PARTIDO LISTO" };
       }
@@ -79,12 +128,10 @@ const Dashboard = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00]">
-      
-      {/* Pasamos las props reales al Navbar */}
       <Navbar user={user} onLogout={onLogout} />
 
       <main className="pt-32 px-6 max-w-7xl mx-auto pb-20">
-        
+        {/* ... Resto de tu JSX (Cabecera, Filtros, Grid, Mapa) se mantiene igual ... */}
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
           <div className="space-y-1">
             <h2 className="text-[10px] font-black italic text-[#CCFF00] uppercase tracking-[0.4em]">Talca Hub</h2>
@@ -121,7 +168,6 @@ const Dashboard = ({ user, onLogout }) => {
         </div>
 
         <div className="grid grid-cols-12 gap-8 items-start">
-          
           <div className="col-span-12 lg:col-span-5 space-y-4 max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
             {partidos
               .filter(p => filtro === 'TODOS' || p.estado === filtro)
@@ -132,6 +178,8 @@ const Dashboard = ({ user, onLogout }) => {
                   isAdmin={isAdmin} 
                   onDelete={handleEliminarPartido}
                   onSelect={(match) => { setSelectedPartido(match); setModalType('UNIRSE'); }}
+                  // OPCIONAL: Pasar una prop para saber si el usuario ya está dentro
+                  isJoined={p.jugadoresInscritos?.includes(user?.email)}
                 />
             ))}
           </div>

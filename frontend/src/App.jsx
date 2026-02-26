@@ -6,6 +6,7 @@ import { jwtDecode } from 'jwt-decode';
 // Vistas
 import Dashboard from './pages/Dashboard';
 import Landing from './pages/Landing';
+import MyTeams from './pages/MyTeams'; // <--- Nueva Importación
 import Navbar from './components/Navbar';
 
 function App() {
@@ -41,17 +42,25 @@ function App() {
         {user && <Navbar user={user} onLogout={handleLogout} />}
         
         <Routes>
+          {/* LANDING / LOGIN */}
           <Route 
             path="/" 
             element={!user ? <Landing onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/dashboard" />} 
           />
           
+          {/* DASHBOARD PRINCIPAL */}
           <Route 
             path="/dashboard" 
             element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
           />
 
-          {/* Redirección por defecto */}
+          {/* MIS EQUIPOS - NUEVA RUTA */}
+          <Route 
+            path="/mis-equipos" 
+            element={user ? <MyTeams user={user} /> : <Navigate to="/" />} 
+          />
+
+          {/* Redirección por defecto (Manda a "/" y si hay user, el "/" manda a Dashboard) */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
