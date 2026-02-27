@@ -1,7 +1,9 @@
-import React from 'react';
-import { X, UserPlus, Swords, Calendar, MapPin, ChevronRight, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, UserPlus, Swords, Calendar, MapPin, ChevronRight, Clock, CheckCircle, Loader2 } from 'lucide-react';
+// 1. IMPORTAMOS EL NUEVO SELECTOR
+import RecintoSelector from './RecintoSelector';
 
-// Datos de recintos oficiales para el selector
+// Mantenemos esto como "Base de Datos de Referencia" para tu validación de Admin
 export const RECINTOS_OFICIALES = [
   { id: 'r1', nombre: "GREEN CLUB", ciudad: "TALCA", direccion: "24 Norte 1245", lat: -35.4120, lng: -71.6420 },
   { id: 'r2', nombre: "ESTADIO FISCAL", ciudad: "TALCA", direccion: "Alameda 251", lat: -35.4264, lng: -71.6554 },
@@ -11,9 +13,12 @@ export const RECINTOS_OFICIALES = [
 const MatchModals = ({ 
   user, modalType, setModalType, selectedPartido, handleUnirseMatch, 
   misEquipos, step, setStep, formPartida, setFormPartida, 
-  handleCrearPartida, nuevoEquipo, setNuevoEquipo, setMisEquipos 
+  handleCrearPartida, nuevoEquipo, setNuevoEquipo, setMisEquipos,
+  handleCrearEquipoDB // <-- IMPORTANTE: Esta prop debe venir del Dashboard
 }) => {
   
+  const [isCreating, setIsCreating] = useState(false);
+
   if (!modalType) return null;
 
   return (
@@ -46,7 +51,6 @@ const MatchModals = ({
             
             <div className="space-y-4">
               {selectedPartido.tipo === 'JUGADORES' ? (
-                /* MODO JUGADOR INDIVIDUAL */
                 <button 
                   onClick={() => handleUnirseMatch(selectedPartido.id, 'PLAYER')} 
                   className="w-full bg-white/5 border border-white/5 p-8 rounded-[32px] flex items-center gap-6 hover:bg-[#ccff00]/10 hover:border-[#ccff00] transition-all group text-left"
@@ -60,7 +64,6 @@ const MatchModals = ({
                   </div>
                 </button>
               ) : (
-                /* MODO VERSUS (RETO DE EQUIPO) */
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2 ml-2">
                     <Swords size={16} className="text-orange-500" />
@@ -69,9 +72,7 @@ const MatchModals = ({
                   
                   <div className="grid gap-3">
                     {misEquipos.map(me => {
-                      // Validación: No puedes retarte a ti mismo con el mismo equipo
                       const isSameTeam = selectedPartido.equipo === me.nombre;
-                      
                       return (
                         <button 
                           key={me.id} 
@@ -130,89 +131,109 @@ const MatchModals = ({
                   </select>
                 </div>
 
-                {/* FILA 2: FECHA Y HORA (NUEVO) */}
+                {/* FILA 2: FECHA Y HORA */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic px-1">Fecha</label>
-                    <div className="relative">
-                      <input 
-                        type="date" 
-                        value={formPartida.fecha}
-                        onChange={(e) => setFormPartida({...formPartida, fecha: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 h-14 px-5 rounded-2xl text-white outline-none focus:border-[#ccff00] font-bold uppercase transition-all [color-scheme:dark]"
-                      />
-                    </div>
+                    <input 
+                      type="date" 
+                      value={formPartida.fecha}
+                      onChange={(e) => setFormPartida({...formPartida, fecha: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 h-14 px-5 rounded-2xl text-white outline-none focus:border-[#ccff00] font-bold uppercase transition-all [color-scheme:dark]"
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic px-1">Hora</label>
-                    <div className="relative">
-                      <input 
-                        type="time" 
-                        value={formPartida.hora}
-                        onChange={(e) => setFormPartida({...formPartida, hora: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 h-14 px-5 rounded-2xl text-white outline-none focus:border-[#ccff00] font-bold transition-all [color-scheme:dark]"
-                      />
-                    </div>
+                    <input 
+                      type="time" 
+                      value={formPartida.hora}
+                      onChange={(e) => setFormPartida({...formPartida, hora: e.target.value})}
+                      className="w-full bg-white/5 border border-white/10 h-14 px-5 rounded-2xl text-white outline-none focus:border-[#ccff00] font-bold transition-all [color-scheme:dark]"
+                    />
                   </div>
                 </div>
 
-                {/* FILA 3: RECINTO */}
+                {/* FILA 3: BUSCADOR DE RECINTOS (GOOGLE MAPS) */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic px-1">Ubicación (Recinto Oficial)</label>
-                  <div className="relative">
-                    <select 
-                      value={formPartida.recintoId}
-                      onChange={(e) => {
-                        const rec = RECINTOS_OFICIALES.find(r => r.id === e.target.value);
-                        if(rec) {
-                          setFormPartida({
-                            ...formPartida, 
-                            recintoId: e.target.value, 
-                            recinto: rec.nombre,
-                            lat: rec.lat,
-                            lng: rec.lng
-                          });
-                        }
-                      }}
-                      className="w-full bg-white/5 border border-white/10 h-14 px-5 rounded-2xl text-white outline-none focus:border-[#ccff00] appearance-none cursor-pointer font-bold italic uppercase transition-all"
-                    >
-                      <option value="" className="bg-slate-900">-- SELECCIONAR CANCHA --</option>
-                      {RECINTOS_OFICIALES.map(r => (
-                        <option key={r.id} value={r.id} className="bg-slate-900">{r.nombre} ({r.ciudad})</option>
-                      ))}
-                    </select>
-                    <MapPin className="absolute right-5 top-4 text-slate-600" size={20}/>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic px-1">
+                    Ubicación (Búsqueda Maps)
+                  </label>
+                  
+                  <RecintoSelector 
+                    defaultValue={formPartida.recinto}
+                    onSelectRecinto={(datos) => {
+                      const coincidencia = RECINTOS_OFICIALES.find(
+                        r => r.nombre.toUpperCase() === datos.nombre.toUpperCase()
+                      );
+
+                      setFormPartida({
+                        ...formPartida, 
+                        recinto: datos.nombre,
+                        direccion: datos.direccion,
+                        lat: datos.lat,
+                        lng: datos.lng,
+                        isOficial: !!coincidencia
+                      });
+                    }}
+                  />
+                  
+                  <div className="flex items-center justify-between px-1">
+                    {formPartida.isOficial ? (
+                      <p className="text-[9px] text-[#ccff00] font-black uppercase flex items-center gap-1 italic">
+                        <CheckCircle size={10} strokeWidth={3} /> Recinto Oficial Verificado
+                      </p>
+                    ) : formPartida.recinto ? (
+                      <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight">
+                        📍 {formPartida.direccion || 'Recinto sugerido por usuario'}
+                      </p>
+                    ) : null}
+                    
+                    {user?.email === 'ssagredo.d@gmail.com' && formPartida.recinto && (
+                      <button 
+                        onClick={() => setFormPartida({...formPartida, isOficial: !formPartida.isOficial})}
+                        className="text-[8px] bg-white/5 border border-white/10 px-2 py-1 rounded-lg text-slate-400 hover:text-[#ccff00] transition-colors uppercase font-black"
+                      >
+                        [Admin] {formPartida.isOficial ? 'Quitar Verificación' : 'Hacer Oficial'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* FILA 4: TOGGLE CANCHA */}
-                <div className="bg-white/5 p-5 rounded-[24px] border border-white/5 flex justify-between items-center group hover:bg-white/[0.07] transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl transition-all ${formPartida.canchaConfirmada ? 'bg-[#ccff00] text-black' : 'bg-white/5 text-slate-500'}`}>
-                      <Calendar size={20}/>
-                    </div>
-                    <div>
-                      <p className="text-xs font-black italic uppercase">Cancha Reservada</p>
-                      <p className="text-[9px] text-slate-500 font-bold uppercase">Activa si ya pagaste el turno</p>
-                    </div>
+                {/* FILA 4: JUGADORES ASEGURADOS */}
+                <div className="space-y-3 bg-white/5 p-5 rounded-[24px] border border-white/5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic">¿Con cuántos jugadores cuentas?</label>
+                    <span className="text-[#ccff00] font-black italic text-sm">{(formPartida.jugadoresBase || 1)} / 6</span>
                   </div>
-                  <button 
-                    onClick={() => setFormPartida({...formPartida, canchaConfirmada: !formPartida.canchaConfirmada})}
-                    className={`w-14 h-8 rounded-full transition-all relative ${formPartida.canchaConfirmada ? 'bg-[#ccff00]' : 'bg-slate-700'}`}
-                  >
-                    <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all shadow-md ${formPartida.canchaConfirmada ? 'left-7' : 'left-1'}`} />
-                  </button>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5, 6].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setFormPartida({ ...formPartida, jugadoresBase: num })}
+                        className={`flex-1 h-10 rounded-xl font-black transition-all border ${
+                          (formPartida.jugadoresBase || 1) === num 
+                          ? 'bg-[#ccff00] text-black border-[#ccff00] scale-105 shadow-lg shadow-[#ccff00]/20' 
+                          : 'bg-white/5 text-white border-white/10 hover:border-white/40'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* SELECTOR MODO */}
                 <div className="flex gap-4">
                   <button 
+                    type="button"
                     onClick={() => setFormPartida({...formPartida, tipo: 'JUGADORES'})} 
                     className={`flex-1 py-5 rounded-2xl font-black italic text-[11px] uppercase border transition-all ${formPartida.tipo === 'JUGADORES' ? 'bg-[#ccff00] text-black border-[#ccff00]' : 'border-white/5 text-slate-500 hover:text-white hover:bg-white/5'}`}
                   >
                     Modo Mix
                   </button>
                   <button 
+                    type="button"
                     onClick={() => setFormPartida({...formPartida, tipo: 'RIVAL'})} 
                     className={`flex-1 py-5 rounded-2xl font-black italic text-[11px] uppercase border transition-all ${formPartida.tipo === 'RIVAL' ? 'bg-orange-500 text-black border-orange-500' : 'border-white/5 text-slate-500 hover:text-white hover:bg-white/5'}`}
                   >
@@ -222,9 +243,9 @@ const MatchModals = ({
 
                 <button 
                   onClick={handleCrearPartida} 
-                  disabled={!formPartida.equipoId || !formPartida.recintoId || !formPartida.fecha || !formPartida.hora}
+                  disabled={!formPartida.equipoId || !formPartida.recinto || !formPartida.fecha || !formPartida.hora}
                   className={`w-full h-20 text-lg font-black italic uppercase rounded-[28px] transition-all shadow-xl active:scale-95 mt-4 ${
-                    formPartida.equipoId && formPartida.recintoId && formPartida.fecha && formPartida.hora
+                    formPartida.equipoId && formPartida.recinto && formPartida.fecha && formPartida.hora
                     ? 'bg-[#ccff00] text-black shadow-[#ccff00]/20 hover:bg-white' 
                     : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
                   }`}
@@ -233,7 +254,7 @@ const MatchModals = ({
                 </button>
               </div>
             ) : (
-              /* REGISTRO DE NUEVO CLUB */
+              /* REGISTRO DE NUEVO CLUB - CORREGIDO PARA DB */
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic ml-1">Nombre de la Institución</label>
@@ -247,19 +268,44 @@ const MatchModals = ({
                   />
                 </div>
                 <button 
-                  onClick={() => {
+                  disabled={!nuevoEquipo.trim() || isCreating}
+                  onClick={async () => {
                     if (!nuevoEquipo.trim()) return;
-                    const n = { id: Date.now(), nombre: nuevoEquipo.toUpperCase(), creadorEmail: user?.email };
-                    setMisEquipos([...misEquipos, n]);
-                    setNuevoEquipo('');
-                    setStep(1);
-                    setFormPartida({...formPartida, equipoId: n.id});
+                    setIsCreating(true);
+                    try {
+                      // Llamamos a la función que conecta con FastAPI
+                      const equipoGuardado = await handleCrearEquipoDB(nuevoEquipo.toUpperCase());
+                      
+                      if (equipoGuardado) {
+                        setNuevoEquipo('');
+                        setStep(1);
+                        // Seteamos el equipo recién creado en el formulario de la partida
+                        setFormPartida({...formPartida, equipoId: equipoGuardado.id});
+                      }
+                    } catch (error) {
+                      console.error("Error al registrar equipo:", error);
+                    } finally {
+                      setIsCreating(false);
+                    }
                   }} 
-                  className="w-full h-16 bg-[#ccff00] text-black font-black italic uppercase rounded-[24px] hover:bg-white transition-all shadow-lg active:scale-95"
+                  className="w-full h-16 bg-[#ccff00] text-black font-black italic uppercase rounded-[24px] hover:bg-white transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
                 >
-                  Registrar Club Oficial
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Registrando...
+                    </>
+                  ) : (
+                    'Registrar Club Oficial'
+                  )}
                 </button>
-                <button onClick={() => setStep(1)} className="w-full text-[10px] font-black uppercase text-slate-500 hover:text-white">Volver atrás</button>
+                <button 
+                  onClick={() => setStep(1)} 
+                  disabled={isCreating}
+                  className="w-full text-[10px] font-black uppercase text-slate-500 hover:text-white"
+                >
+                  Volver atrás
+                </button>
               </div>
             )}
           </div>
