@@ -56,34 +56,45 @@ const Dashboard = ({ user, onLogout }) => {
   });
 
   const isAdmin = user?.email === 'ssagredo13@gmail.com';
-  
-  // ✅ CORRECCIÓN 1: URL Dinámica según el entorno (Vercel o Local)
   const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api";
 
-  // --- CARGA DE DATOS ---
+  // --- CARGA INICIAL ---
+  const cargarPartidas = async () => {
+    try {
+      const res = await fetch(`${API_URL}/partidos`);
+      if (res.ok) setPartidos(await res.json());
+    } catch (err) {
+      console.error("Error cargando partidas:", err);
+    }
+  };
+
   useEffect(() => {
-    const cargarTodoDesdeDB = async () => {
+    const cargarDatosBase = async () => {
       setLoading(true);
       try {
-        const [resPartidos, resRecintos, resEquipos] = await Promise.all([
-          fetch(`${API_URL}/partidos`),
+        const [resRecintos, resEquipos] = await Promise.all([
           fetch(`${API_URL}/recintos`),
           fetch(`${API_URL}/equipos?email=${user.email}`)
         ]);
-
-        if (resPartidos.ok) setPartidos(await resPartidos.json());
         if (resRecintos.ok) setRecintosOficiales(await resRecintos.json());
         if (resEquipos.ok) setMisEquipos(await resEquipos.json());
-        
+        await cargarPartidas();
       } catch (err) {
         console.error("⚠️ Error conectando al backend:", err);
       } finally {
         setLoading(false);
       }
     };
-    
-    if (user?.email) cargarTodoDesdeDB();
+    if (user?.email) cargarDatosBase();
   }, [user.email, API_URL]);
+
+  // ✅ POLLING: Sincronización automática cada 20 segundos
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      cargarPartidas();
+    }, 20000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   // --- HANDLERS ---
   const handleCrearEquipoDB = async (nombreNuevo) => {
@@ -100,7 +111,7 @@ const Dashboard = ({ user, onLogout }) => {
         return guardado;
       }
     } catch (e) {
-      alert("❌ Error al guardar el equipo en la base de datos");
+      alert("❌ Error al guardar el equipo");
     }
   };
   
@@ -109,9 +120,7 @@ const Dashboard = ({ user, onLogout }) => {
       alert("⚠️ Faltan datos críticos."); return; 
     }
 
-    // ✅ CORRECCIÓN 2: Buscar usando _id (MongoDB) o id (Local/Compatibilidad)
     const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
-    
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
 
@@ -122,7 +131,6 @@ const Dashboard = ({ user, onLogout }) => {
       jugadores: iniciales, 
       jugadoresInscritos: [user.email],
       total: totalCupos,
-      arqueroFaltante: formPartida.requiereArquero,
       estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES'
     };
 
@@ -132,7 +140,6 @@ const Dashboard = ({ user, onLogout }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nuevaPartida)
       });
-
       if (res.ok) {
         const guardada = await res.json();
         setPartidos([guardada, ...partidos]);
@@ -144,30 +151,43 @@ const Dashboard = ({ user, onLogout }) => {
         });
       }
     } catch (error) {
-      alert("❌ Error al guardar partida en el servidor");
+      alert("❌ Error al guardar partida");
     }
   };
 
+  // ✅ CORRECCIÓN: handleUnirseMatch Sincronizado con Base de Datos
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
-    // Lógica optimizada para soportar _id de Mongo
-    setPartidos(prev => prev.map(p => {
-      const currentId = p._id || p.id;
-      if (currentId === pId) {
-        if (mode === 'PLAYER') {
-          const nuevosInscritos = [...(p.jugadoresInscritos || []), user.email];
-          return { ...p, jugadores: nuevosInscritos.length, jugadoresInscritos: nuevosInscritos };
-        }
-        return { ...p, rival: equipoData.nombre, estado: "PARTIDO LISTO" };
+    try {
+      // Definimos qué datos enviar según si es Jugador o Equipo
+      const payload = mode === 'PLAYER' 
+        ? { nuevoJugadorEmail: user.email }
+        : { rival: equipoData.nombre, estado: "PARTIDO LISTO", jugadores: 12 };
+
+      const res = await fetch(`${API_URL}/partidos/${pId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const partidoActualizado = await res.json();
+        // Actualizamos estado local inmediatamente
+        setPartidos(prev => prev.map(p => 
+          (p._id || p.id) === pId ? partidoActualizado : p
+        ));
+        setModalType(null);
+      } else {
+        alert("No se pudo procesar la unión al partido.");
       }
-      return p;
-    }));
-    setModalType(null);
+    } catch (error) {
+      console.error("Error uniendo al match:", error);
+      alert("Error de conexión con el servidor.");
+    }
   };
 
   const handleEliminarPartido = async (e, pId) => {
     e.stopPropagation();
     if (!window.confirm("¿Deseas eliminar esta partida?")) return;
-
     try {
       const res = await fetch(`${API_URL}/partidos/${pId}`, { method: 'DELETE' });
       if (res.ok) {
@@ -190,6 +210,7 @@ const Dashboard = ({ user, onLogout }) => {
       <Navbar user={user} onLogout={onLogout} />
 
       <main className="pt-36 px-4 md:px-8 max-w-[1400px] mx-auto pb-20">
+        {/* Encabezado */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
           <div className="space-y-2">
             <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Live Talca Hub</h2>
@@ -197,7 +218,6 @@ const Dashboard = ({ user, onLogout }) => {
               Partidas <span className="opacity-10">Activas</span>
             </h1>
           </div>
-          
           <button 
             onClick={() => {setModalType('PARTIDA'); setStep(1);}} 
             className="bg-[#CCFF00] text-black h-16 px-10 rounded-none skew-x-[-12deg] hover:bg-white transition-all shadow-[0_0_30px_rgba(204,255,0,0.15)] active:scale-95"
@@ -226,9 +246,9 @@ const Dashboard = ({ user, onLogout }) => {
         <div className="grid grid-cols-12 gap-8 lg:gap-12 items-start">
           {/* Lista de Partidas */}
           <div className="col-span-12 lg:col-span-5 space-y-6 max-h-[800px] overflow-y-auto pr-4 custom-scrollbar">
-            {partidos.length === 0 ? (
+            {partidos.filter(p => filtro === 'TODOS' || p.estado === filtro).length === 0 ? (
               <div className="border border-white/5 bg-white/5 p-10 text-center rounded-3xl">
-                <p className="text-slate-500 font-black italic uppercase text-sm">No hay partidas registradas.</p>
+                <p className="text-slate-500 font-black italic uppercase text-sm">No hay partidas en esta categoría.</p>
               </div>
             ) : (
               partidos
@@ -249,7 +269,7 @@ const Dashboard = ({ user, onLogout }) => {
             )}
           </div>
 
-          {/* Mapa Leaflet */}
+          {/* Mapa */}
           <div className="col-span-12 lg:col-span-7 h-[500px] lg:h-[800px] sticky top-32">
             <div className="h-full w-full border border-white/10 rounded-[48px] overflow-hidden bg-[#0b1224] relative shadow-2xl">
               <MapContainer center={mapCenter} zoom={13} className="h-full w-full">
