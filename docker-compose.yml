@@ -1,4 +1,5 @@
 services:
+  # Base de Datos Local (Opcional, ahora usaremos Atlas)
   mongodb:
     image: mongo:latest
     container_name: mtm-db
@@ -7,6 +8,7 @@ services:
     volumes:
       - mongo-data:/data/db
 
+  # Backend FastAPI
   backend:
     build: ./backend
     container_name: mtm-backend
@@ -14,12 +16,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # IMPORTANTE: Aquí usamos el nombre del servicio 'mongodb'
-      - MONGO_URL=mongodb://mongodb:27017
+      # --- CONEXIÓN A LA NUBE (ATLAS) ---
+      # IMPORTANTE: Reemplaza TU_PASSWORD_REAL por la contraseña de ssagredo13
+      - MONGO_URL=mongodb+srv://ssagredo13:ssagredo13@cluster0.jh8wz8e.mongodb.net/match-to-match?retryWrites=true&w=majority&appName=Cluster0
       - DB_NAME=match_to_match
-    depends_on:
-      - mongodb
+    # Ya no necesita estrictamente el 'depends_on' de mongodb local porque apunta a la nube
 
+  # Frontend React
   frontend:
     build: ./frontend
     container_name: mtm-frontend

@@ -5,9 +5,10 @@ from pydantic import BaseModel
 from bson import ObjectId
 from typing import List, Optional
 import os
+from dotenv import load_dotenv  # <--- NEW: Importar esto
 
-# NOTA: Si vas a usar database.py, asegúrate de importarlo así:
-# from app.database import database
+# --- CARGAR VARIABLES DE ENTORNO ---
+load_dotenv()  # <--- NEW: ¡ESTO ES VITAL! Sin esto, ignora el .env
 
 app = FastAPI(title="Match to Match API")
 
@@ -21,10 +22,9 @@ app.add_middleware(
 )
 
 # --- CONEXIÓN BASE DE DATOS ---
-# Usamos el nombre del servicio definido en docker-compose: 'mongodb'
-#MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
-# Debe decir esto:
+# Ahora sí, os.getenv buscará primero en tu .env la URL de Atlas
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://mtm-db:27017")
+
 
 # Configuración de cliente con Timeouts para evitar que el contenedor se quede colgado
 client = AsyncIOMotorClient(
