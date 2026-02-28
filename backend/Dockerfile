@@ -12,4 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+#CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Si main.py está dentro de una carpeta llamada 'app'
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
