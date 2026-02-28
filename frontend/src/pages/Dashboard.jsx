@@ -116,21 +116,42 @@ const Dashboard = ({ user, onLogout }) => {
   };
   
   const handleCrearPartida = async () => {
-    if (!formPartida.equipoId || !formPartida.fecha || !formPartida.hora || !formPartida.recinto) {
-      alert("⚠️ Faltan datos críticos."); return; 
+    // 1. VALIDACIÓN DE CAMPOS OBLIGATORIOS
+    const camposObligatorios = {
+      equipoId: "Seleccionar un equipo",
+      recinto: "Nombre del recinto",
+      fecha: "Fecha del partido",
+      hora: "Hora del partido",
+      lat: "Ubicación en el mapa"
+    };
+
+    const faltantes = Object.keys(camposObligatorios).filter(campo => !formPartida[campo]);
+
+    if (faltantes.length > 0) {
+      const listaFaltantes = faltantes.map(f => `• ${camposObligatorios[f]}`).join('\n');
+      alert(`⚠️ Faltan datos críticos para crear la pichanga:\n\n${listaFaltantes}`);
+      return; 
     }
 
+    // 2. PREPARACIÓN DE DATOS
     const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
 
     const nuevaPartida = {
-      ...formPartida,
       equipo: eq?.nombre || "Sin Equipo",
+      equipoId: String(formPartida.equipoId),
       creadorEmail: user.email,
+      recinto: formPartida.recinto,
+      lat: parseFloat(formPartida.lat),
+      lng: parseFloat(formPartida.lng),
+      hora: formPartida.hora,
+      fecha: formPartida.fecha,
+      tipo: formPartida.tipo,
       jugadores: iniciales, 
-      jugadoresInscritos: [user.email],
       total: totalCupos,
+      arqueroFaltante: !!formPartida.requiereArquero,
+      jugadoresInscritos: [user.email],
       estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES'
     };
 
@@ -140,6 +161,7 @@ const Dashboard = ({ user, onLogout }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nuevaPartida)
       });
+
       if (res.ok) {
         const guardada = await res.json();
         setPartidos([guardada, ...partidos]);
@@ -149,16 +171,19 @@ const Dashboard = ({ user, onLogout }) => {
           hora: '', fecha: '', tipo: 'JUGADORES', jugadoresPorLado: 6,
           jugadoresInvitados: 0, requiereArquero: false, canchaConfirmada: false 
         });
+        alert("✅ Partida publicada exitosamente");
+      } else {
+        const errData = await res.json();
+        alert(`❌ Error del servidor (422): ${JSON.stringify(errData.detail)}`);
       }
     } catch (error) {
-      alert("❌ Error al guardar partida");
+      alert("❌ Error de red: El backend no responde.");
     }
   };
 
-  // ✅ CORRECCIÓN: handleUnirseMatch Sincronizado con Base de Datos
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
     try {
-      // Definimos qué datos enviar según si es Jugador o Equipo
+      // Definimos qué datos enviar según si es Jugador o Equipo (Versus = 12 jugadores)
       const payload = mode === 'PLAYER' 
         ? { nuevoJugadorEmail: user.email }
         : { rival: equipoData.nombre, estado: "PARTIDO LISTO", jugadores: 12 };
@@ -171,13 +196,13 @@ const Dashboard = ({ user, onLogout }) => {
 
       if (res.ok) {
         const partidoActualizado = await res.json();
-        // Actualizamos estado local inmediatamente
         setPartidos(prev => prev.map(p => 
           (p._id || p.id) === pId ? partidoActualizado : p
         ));
         setModalType(null);
+        alert(mode === 'PLAYER' ? "¡Te has unido a la pichanga!" : "¡Reto aceptado! Partido listo.");
       } else {
-        alert("No se pudo procesar la unión al partido.");
+        alert("No se pudo procesar la unión.");
       }
     } catch (error) {
       console.error("Error uniendo al match:", error);
@@ -210,7 +235,6 @@ const Dashboard = ({ user, onLogout }) => {
       <Navbar user={user} onLogout={onLogout} />
 
       <main className="pt-36 px-4 md:px-8 max-w-[1400px] mx-auto pb-20">
-        {/* Encabezado */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
           <div className="space-y-2">
             <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Live Talca Hub</h2>
@@ -228,7 +252,6 @@ const Dashboard = ({ user, onLogout }) => {
           </button>
         </div>
 
-        {/* Filtros */}
         <div className="flex gap-3 mb-12 overflow-x-auto pb-4 no-scrollbar">
           {['TODOS', 'BUSCANDO JUGADORES', 'BUSCANDO RIVAL', 'PARTIDO LISTO'].map(f => (
             <button 
@@ -244,7 +267,6 @@ const Dashboard = ({ user, onLogout }) => {
         </div>
 
         <div className="grid grid-cols-12 gap-8 lg:gap-12 items-start">
-          {/* Lista de Partidas */}
           <div className="col-span-12 lg:col-span-5 space-y-6 max-h-[800px] overflow-y-auto pr-4 custom-scrollbar">
             {partidos.filter(p => filtro === 'TODOS' || p.estado === filtro).length === 0 ? (
               <div className="border border-white/5 bg-white/5 p-10 text-center rounded-3xl">
@@ -269,7 +291,6 @@ const Dashboard = ({ user, onLogout }) => {
             )}
           </div>
 
-          {/* Mapa */}
           <div className="col-span-12 lg:col-span-7 h-[500px] lg:h-[800px] sticky top-32">
             <div className="h-full w-full border border-white/10 rounded-[48px] overflow-hidden bg-[#0b1224] relative shadow-2xl">
               <MapContainer center={mapCenter} zoom={13} className="h-full w-full">

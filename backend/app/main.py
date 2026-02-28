@@ -17,7 +17,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], # Métodos explícitos
     allow_headers=["*"],
 )
 
@@ -36,6 +36,12 @@ db = client[DB_NAME]
 recintos_col = db.get_collection("recintos")
 equipos_col = db.get_collection("equipos")
 partidos_col = db.get_collection("partidos")
+
+# --- UTILIDAD PARA FORMATEAR MONGO ---
+def format_mongo_doc(doc):
+    if not doc: return None
+    doc["id"] = str(doc.pop("_id"))
+    return doc
 
 # --- MODELOS DE DATOS ---
 class Equipo(BaseModel):
@@ -69,11 +75,10 @@ async def root():
 
 @app.get("/api/equipos")
 async def obtener_equipos(email: Optional[str] = None):
-    """Si viene email, filtra mis equipos. Si no (Admin), trae todos."""
     equipos = []
     filtro = {"creadorEmail": email} if email else {}
     async for eq in equipos_col.find(filtro):
-        equipos.append({"id": str(eq["_id"]), **{k: v for k, v in eq.items() if k != "_id"}})
+        equipos.append(format_mongo_doc(eq))
     return equipos
 
 @app.post("/api/equipos")
@@ -84,73 +89,80 @@ async def crear_equipo(equipo: Equipo):
     nuevo_eq = await equipos_col.insert_one(equipo.model_dump())
     return {"id": str(nuevo_eq.inserted_id), **equipo.model_dump()}
 
-# --- SECCIÓN PARTIDOS (Sincronización y Registro) ---
+# --- SECCIÓN PARTIDOS ---
 
 @app.get("/api/partidos")
 async def listar_partidos(email: Optional[str] = None):
-    """Historial general o filtrado por usuario."""
     partidos = []
-    # Si pasas email, podrías filtrar partidas donde el usuario es creador o está inscrito
-    filtro = {"$or": [{"creadorEmail": email}, {"jugadoresInscritos": email}]} if email else {}
-    async for p in partidos_col.find(filtro).sort("fecha", -1): # Ordenados por fecha
-        partidos.append({"id": str(p["_id"]), **{k: v for k, v in p.items() if k != "_id"}})
+    filtro = {}
+    if email:
+        filtro = {"$or": [{"creadorEmail": email}, {"jugadoresInscritos": email}]}
+    
+    async for p in partidos_col.find(filtro).sort("_id", -1): 
+        partidos.append(format_mongo_doc(p))
     return partidos
 
 @app.post("/api/partidos")
 async def crear_partido(partido: Partido):
-    res = await partidos_col.insert_one(partido.model_dump())
-    return {"id": str(res.inserted_id), **partido.model_dump()}
+    try:
+        res = await partidos_col.insert_one(partido.model_dump())
+        return {"id": str(res.inserted_id), **partido.model_dump()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al guardar: {str(e)}")
 
 @app.patch("/api/partidos/{partido_id}")
 async def actualizar_partido(partido_id: str, data: dict):
-    """Sincroniza uniones de jugadores y retos de equipos."""
     try:
+        if not ObjectId.is_valid(partido_id):
+            raise HTTPException(status_code=400, detail="ID de partido inválido")
+            
         oid = ObjectId(partido_id)
         update_ops = {}
 
-        # Caso 1: Se une un equipo (Rival)
         if "rival" in data:
             update_ops["$set"] = {
                 "rival": data["rival"],
                 "estado": "PARTIDO LISTO",
-                "jugadores": 12 # Forzamos el 12/12 para Versus
+                "jugadores": 12 
             }
-        
-        # Caso 2: Se une un jugador individual
         elif "nuevoJugadorEmail" in data:
             email = data["nuevoJugadorEmail"]
-            update_ops["$addToSet"] = {"jugadoresInscritos": email} # Evita duplicados
+            update_ops["$addToSet"] = {"jugadoresInscritos": email}
             update_ops["$inc"] = {"jugadores": 1}
 
         if not update_ops:
-            raise HTTPException(status_code=400, detail="No hay datos validos para actualizar")
+            raise HTTPException(status_code=400, detail="Datos de actualización no válidos")
 
-        await partidos_col.update_one({"_id": oid}, update_ops)
+        res = await partidos_col.update_one({"_id": oid}, update_ops)
         
-        # Retornamos el partido actualizado para que el Front lo vea de inmediato
+        if res.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Partido no encontrado")
+
         updated_doc = await partidos_col.find_one({"_id": oid})
-        if updated_doc:
-            return {"id": str(updated_doc["_id"]), **{k: v for k, v in updated_doc.items() if k != "_id"}}
+        return format_mongo_doc(updated_doc)
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error al actualizar: {str(e)}")
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/partidos/{id}")
 async def eliminar_partido(id: str):
     try:
+        if not ObjectId.is_valid(id):
+             raise HTTPException(status_code=400, detail="ID inválido")
         res = await partidos_col.delete_one({"_id": ObjectId(id)})
         if res.deleted_count:
             return {"msg": "Partido eliminado"}
         raise HTTPException(status_code=404, detail="No encontrado")
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # --- SECCIÓN RECINTOS ---
 @app.get("/api/recintos")
 async def listar_recintos():
     items = []
     async for r in recintos_col.find():
-        items.append({"id": str(r["_id"]), **{k: v for k, v in r.items() if k != "_id"}})
+        items.append(format_mongo_doc(r))
     return items
 
 if __name__ == "__main__":
