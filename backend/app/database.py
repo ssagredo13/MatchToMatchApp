@@ -21,7 +21,8 @@ client = motor.motor_asyncio.AsyncIOMotorClient(
 
 # --- BASE DE DATOS Y COLECCIONES ---
 # Aseguramos usar el mismo nombre de base de datos que en main.py
-database = client.match_to_match 
+DB_NAME = os.getenv("DB_NAME", "match_to_match")
+database = client[DB_NAME]
 
 # Colecciones exportables
 recintos_helper = database.get_collection("recintos")

@@ -9,7 +9,7 @@ import Navbar from '../components/Navbar';
 import MatchCard from '../components/MatchCard';
 import MatchModals from '../components/MatchModals';
 
-// --- CONFIGURACIÓN DE ICONOS LEAFLET (Corregido para evitar iconos invisibles) ---
+// --- CONFIGURACIÓN DE ICONOS LEAFLET ---
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -46,7 +46,7 @@ const Dashboard = ({ user, onLogout }) => {
   const [step, setStep] = useState(1);
   const [selectedPartido, setSelectedPartido] = useState(null);
   const [activeMatchId, setActiveMatchId] = useState(null);
-  const [mapCenter, setMapCenter] = useState([-35.4264, -71.6554]); // Talca por defecto
+  const [mapCenter, setMapCenter] = useState([-35.4264, -71.6554]); 
   const [nuevoEquipo, setNuevoEquipo] = useState('');
   
   const [formPartida, setFormPartida] = useState({ 
@@ -56,7 +56,9 @@ const Dashboard = ({ user, onLogout }) => {
   });
 
   const isAdmin = user?.email === 'ssagredo13@gmail.com';
-  const API_URL = "http://localhost:8000/api";
+  
+  // ✅ CORRECCIÓN 1: URL Dinámica según el entorno (Vercel o Local)
+  const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api";
 
   // --- CARGA DE DATOS ---
   useEffect(() => {
@@ -81,7 +83,7 @@ const Dashboard = ({ user, onLogout }) => {
     };
     
     if (user?.email) cargarTodoDesdeDB();
-  }, [user.email]);
+  }, [user.email, API_URL]);
 
   // --- HANDLERS ---
   const handleCrearEquipoDB = async (nombreNuevo) => {
@@ -107,7 +109,9 @@ const Dashboard = ({ user, onLogout }) => {
       alert("⚠️ Faltan datos críticos."); return; 
     }
 
-    const eq = misEquipos.find(e => e.id === formPartida.equipoId || e.id === Number(formPartida.equipoId));
+    // ✅ CORRECCIÓN 2: Buscar usando _id (MongoDB) o id (Local/Compatibilidad)
+    const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
+    
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
 
@@ -133,7 +137,6 @@ const Dashboard = ({ user, onLogout }) => {
         const guardada = await res.json();
         setPartidos([guardada, ...partidos]);
         setModalType(null);
-        // Reset form
         setFormPartida({ 
           equipoId: '', recinto: '', recintoId: '', lat: null, lng: null, 
           hora: '', fecha: '', tipo: 'JUGADORES', jugadoresPorLado: 6,
@@ -146,9 +149,10 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
-    // Aquí implementamos la lógica de unión
+    // Lógica optimizada para soportar _id de Mongo
     setPartidos(prev => prev.map(p => {
-      if (p.id === pId) {
+      const currentId = p._id || p.id;
+      if (currentId === pId) {
         if (mode === 'PLAYER') {
           const nuevosInscritos = [...(p.jugadoresInscritos || []), user.email];
           return { ...p, jugadores: nuevosInscritos.length, jugadoresInscritos: nuevosInscritos };
@@ -167,7 +171,7 @@ const Dashboard = ({ user, onLogout }) => {
     try {
       const res = await fetch(`${API_URL}/partidos/${pId}`, { method: 'DELETE' });
       if (res.ok) {
-        setPartidos(prev => prev.filter(p => p.id !== pId));
+        setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
       }
     } catch (error) {
       alert("No se pudo eliminar.");
@@ -229,16 +233,19 @@ const Dashboard = ({ user, onLogout }) => {
             ) : (
               partidos
                 .filter(p => filtro === 'TODOS' || p.estado === filtro)
-                .map(p => (
-                  <div key={p.id} onClick={() => { setActiveMatchId(p.id); if(p.lat) setMapCenter([p.lat, p.lng]); }} 
-                       className={`transition-all duration-300 ${activeMatchId === p.id ? 'scale-[1.02]' : ''}`}>
-                    <MatchCard 
-                      partido={p} user={user} isAdmin={isAdmin} isActive={activeMatchId === p.id}
-                      onDelete={handleEliminarPartido} onSelect={(match) => { setSelectedPartido(match); setModalType('UNIRSE'); }}
-                      isJoined={p.jugadoresInscritos?.includes(user?.email)}
-                    />
-                  </div>
-              ))
+                .map(p => {
+                  const pId = p._id || p.id;
+                  return (
+                    <div key={pId} onClick={() => { setActiveMatchId(pId); if(p.lat) setMapCenter([p.lat, p.lng]); }} 
+                         className={`transition-all duration-300 ${activeMatchId === pId ? 'scale-[1.02]' : ''}`}>
+                      <MatchCard 
+                        partido={p} user={user} isAdmin={isAdmin} isActive={activeMatchId === pId}
+                        onDelete={handleEliminarPartido} onSelect={(match) => { setSelectedPartido(match); setModalType('UNIRSE'); }}
+                        isJoined={p.jugadoresInscritos?.includes(user?.email)}
+                      />
+                    </div>
+                  );
+                })
             )}
           </div>
 
@@ -254,9 +261,9 @@ const Dashboard = ({ user, onLogout }) => {
                 {partidos.map(p => (
                   p.lat && p.lng && (
                     <Marker 
-                      key={p.id} position={[p.lat, p.lng]} 
-                      icon={activeMatchId === p.id ? neonIcon : new L.Icon.Default()}
-                      eventHandlers={{ click: () => setActiveMatchId(p.id) }}
+                      key={p._id || p.id} position={[p.lat, p.lng]} 
+                      icon={activeMatchId === (p._id || p.id) ? neonIcon : new L.Icon.Default()}
+                      eventHandlers={{ click: () => setActiveMatchId(p._id || p.id) }}
                     >
                       <Popup>
                         <div className="text-black p-1 font-bold">
