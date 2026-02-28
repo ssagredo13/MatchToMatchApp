@@ -17,7 +17,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], # Métodos explícitos
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -72,7 +72,6 @@ async def root():
     return {"status": "ok", "message": "Backend Match to Match funcionando"}
 
 # --- SECCIÓN EQUIPOS ---
-
 @app.get("/api/equipos")
 async def obtener_equipos(email: Optional[str] = None):
     equipos = []
@@ -90,14 +89,12 @@ async def crear_equipo(equipo: Equipo):
     return {"id": str(nuevo_eq.inserted_id), **equipo.model_dump()}
 
 # --- SECCIÓN PARTIDOS ---
-
 @app.get("/api/partidos")
 async def listar_partidos(email: Optional[str] = None):
     partidos = []
     filtro = {}
     if email:
         filtro = {"$or": [{"creadorEmail": email}, {"jugadoresInscritos": email}]}
-    
     async for p in partidos_col.find(filtro).sort("_id", -1): 
         partidos.append(format_mongo_doc(p))
     return partidos
@@ -117,33 +114,56 @@ async def actualizar_partido(partido_id: str, data: dict):
             raise HTTPException(status_code=400, detail="ID de partido inválido")
             
         oid = ObjectId(partido_id)
+        
+        # 1. Obtener estado actual del partido
+        partido_actual = await partidos_col.find_one({"_id": oid})
+        if not partido_actual:
+            raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+        # 2. BLOQUEO: Si el partido ya está listo, no se permiten más cambios
+        if partido_actual.get("estado") == "PARTIDO LISTO":
+            raise HTTPException(status_code=403, detail="El partido ya está cerrado y completo.")
+
         update_ops = {}
 
+        # Caso A: Se une un equipo rival
         if "rival" in data:
+            if partido_actual.get("tipo") != "RIVAL":
+                raise HTTPException(status_code=400, detail="Este partido no es de tipo Versus/Rival")
+            
             update_ops["$set"] = {
                 "rival": data["rival"],
                 "estado": "PARTIDO LISTO",
-                "jugadores": 12 
+                "jugadores": 12 # Cupos completos para Versus
             }
+        
+        # Caso B: Se une un jugador individual
         elif "nuevoJugadorEmail" in data:
             email = data["nuevoJugadorEmail"]
+            
+            # Verificar si ya está lleno
+            if partido_actual.get("jugadores", 0) >= partido_actual.get("total", 12):
+                raise HTTPException(status_code=400, detail="La pichanga ya está llena")
+
             update_ops["$addToSet"] = {"jugadoresInscritos": email}
             update_ops["$inc"] = {"jugadores": 1}
+            
+            # Si con este jugador se llega al total, cerramos el partido
+            if (partido_actual.get("jugadores", 0) + 1) >= partido_actual.get("total", 12):
+                if "$set" not in update_ops: update_ops["$set"] = {}
+                update_ops["$set"]["estado"] = "PARTIDO LISTO"
 
         if not update_ops:
-            raise HTTPException(status_code=400, detail="Datos de actualización no válidos")
+            raise HTTPException(status_code=400, detail="No se enviaron datos válidos para actualizar")
 
-        res = await partidos_col.update_one({"_id": oid}, update_ops)
+        await partidos_col.update_one({"_id": oid}, update_ops)
         
-        if res.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Partido no encontrado")
-
         updated_doc = await partidos_col.find_one({"_id": oid})
         return format_mongo_doc(updated_doc)
         
     except Exception as e:
         if isinstance(e, HTTPException): raise e
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 @app.delete("/api/partidos/{id}")
 async def eliminar_partido(id: str):
