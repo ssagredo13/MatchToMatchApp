@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import { Analytics } from '@vercel/analytics/react';
 
 // Vistas
 import Dashboard from './pages/Dashboard';
@@ -59,6 +60,7 @@ function App() {
 
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+        <Analytics />
       </BrowserRouter>
     </GoogleOAuthProvider>
   );
