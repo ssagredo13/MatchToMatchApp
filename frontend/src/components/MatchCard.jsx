@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, MapPin, Users, Trash2, Settings2 } from 'lucide-react';
+import { Clock, MapPin, Users, Trash2, Settings2, Crown } from 'lucide-react';
 
 const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, user }) => {
   // Verificamos si el usuario actual es el creador de esta pichanga
@@ -31,11 +31,22 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
               </span>
             )}
           </h3>
-          {isHost && (
-            <span className="inline-block text-[7px] font-black bg-[#CCFF00] text-black px-2 py-0.5 rounded mt-2 uppercase tracking-tighter">
-              Tu Organización
-            </span>
-          )}
+          
+          {/* NOMBRE DEL ORGANIZADOR DESTACADO */}
+          <div className="flex flex-col gap-1 mt-3">
+            <div className="flex items-center gap-1.5">
+              <Crown size={10} className={isHost ? "text-[#CCFF00]" : "text-slate-500"} />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Organiza: <span className="text-white italic">{partido.creadorNombre || 'Organizador'}</span>
+              </span>
+            </div>
+            
+            {isHost && (
+              <span className="inline-block w-fit text-[7px] font-black bg-[#CCFF00] text-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-[0_0_10px_rgba(204,255,0,0.3)]">
+                Tu Organización
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex flex-col items-end gap-2">
@@ -73,7 +84,7 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
           <div>
             <p className="text-[10px] font-bold text-slate-500 uppercase">Recinto</p>
             <p className="text-xs font-black italic uppercase text-white truncate max-w-[120px]">
-              {partido.cancha}
+              {partido.recinto || partido.cancha}
             </p>
           </div>
         </div>
@@ -99,12 +110,20 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botón Eliminar: Visible para Admin o si eres el Dueño */}
+          {/* Botón Cancelar/Eliminar: Visible para Admin o si eres el Dueño */}
           {(isAdmin || isHost) && (
             <button 
-              onClick={(e) => onDelete(e, partido.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                const confirmMsg = isHost 
+                  ? "¿Estás seguro de cancelar tu pichanga? Se moverá al historial." 
+                  : "¿Eliminar esta partida definitivamente?";
+                if (window.confirm(confirmMsg)) {
+                  onDelete(e, partido.id);
+                }
+              }}
               className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-lg group-hover:scale-105 active:scale-90"
-              title="Eliminar Partida"
+              title={isHost ? "Cancelar Mi Partida" : "Eliminar Partida (Admin)"}
             >
               <Trash2 size={20} />
             </button>

@@ -9,7 +9,7 @@ import Landing from './pages/Landing';
 import MyTeams from './pages/MyTeams';
 import Navbar from './components/Navbar';
 
-// NOTA: Eliminamos la carga de Google Maps (LoadScript) para evitar el error de cobro/conexión
+// NOTA: La carga de Google Maps se maneja de forma externa o por demanda para evitar errores de conexión.
 
 function App() {
   const [user, setUser] = useState(null);
@@ -27,8 +27,16 @@ function App() {
 
   const handleLoginSuccess = (credentialResponse) => {
     const decoded = jwtDecode(credentialResponse.credential);
-    setUser(decoded);
-    localStorage.setItem('user', JSON.stringify(decoded));
+    
+    // Extraemos el nombre real desde el token de Google (name o given_name)
+    // Lo guardamos como 'nombreReal' para que sea fácil de identificar en toda la app
+    const userData = {
+      ...decoded,
+      nombreReal: decoded.name || decoded.given_name || "Organizador"
+    };
+
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
   };
 
   const handleLogout = () => {
@@ -39,6 +47,7 @@ function App() {
   return (
     <GoogleOAuthProvider clientId="954066819953-l2nrbmtvaq74l6q4820tp0d5015ibuaf.apps.googleusercontent.com">
       <BrowserRouter>
+        {/* El Navbar ahora recibe el objeto user con el nombreReal incluido */}
         {user && <Navbar user={user} onLogout={handleLogout} />}
         
         <Routes>
@@ -57,6 +66,7 @@ function App() {
             element={user ? <MyTeams user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
           />
 
+          {/* Redirección por defecto para rutas no encontradas */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>

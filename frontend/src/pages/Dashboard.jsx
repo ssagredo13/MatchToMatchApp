@@ -88,7 +88,6 @@ const Dashboard = ({ user, onLogout }) => {
     if (user?.email) cargarDatosBase();
   }, [user.email, API_URL]);
 
-  // ✅ POLLING: Sincronización automática cada 20 segundos
   useEffect(() => {
     const intervalo = setInterval(() => {
       cargarPartidas();
@@ -116,7 +115,7 @@ const Dashboard = ({ user, onLogout }) => {
   };
   
   const handleCrearPartida = async () => {
-    // 1. VALIDACIÓN DE CAMPOS OBLIGATORIOS
+    // 1. VALIDACIÓN
     const camposObligatorios = {
       equipoId: "Seleccionar un equipo",
       recinto: "Nombre del recinto",
@@ -133,7 +132,7 @@ const Dashboard = ({ user, onLogout }) => {
       return; 
     }
 
-    // 2. PREPARACIÓN DE DATOS
+    // 2. PREPARACIÓN DE DATOS (CORREGIDO CON creadorNombre)
     const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
@@ -142,6 +141,7 @@ const Dashboard = ({ user, onLogout }) => {
       equipo: eq?.nombre || "Sin Equipo",
       equipoId: String(formPartida.equipoId),
       creadorEmail: user.email,
+      creadorNombre: user.nombreReal || user.name || "Organizador", // ✅ CORRECCIÓN: Enviamos el nombre
       recinto: formPartida.recinto,
       lat: parseFloat(formPartida.lat),
       lng: parseFloat(formPartida.lng),
@@ -152,7 +152,8 @@ const Dashboard = ({ user, onLogout }) => {
       total: totalCupos,
       arqueroFaltante: !!formPartida.requiereArquero,
       jugadoresInscritos: [user.email],
-      estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES'
+      estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES',
+      activo: true // ✅ Aseguramos que nazca activa
     };
 
     try {
@@ -174,7 +175,7 @@ const Dashboard = ({ user, onLogout }) => {
         alert("✅ Partida publicada exitosamente");
       } else {
         const errData = await res.json();
-        alert(`❌ Error del servidor (422): ${JSON.stringify(errData.detail)}`);
+        alert(`❌ Error del servidor: ${JSON.stringify(errData.detail)}`);
       }
     } catch (error) {
       alert("❌ Error de red: El backend no responde.");
@@ -183,7 +184,6 @@ const Dashboard = ({ user, onLogout }) => {
 
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
     try {
-      // Definimos qué datos enviar según si es Jugador o Equipo (Versus = 12 jugadores)
       const payload = mode === 'PLAYER' 
         ? { nuevoJugadorEmail: user.email }
         : { rival: equipoData.nombre, estado: "PARTIDO LISTO", jugadores: 12 };
@@ -201,25 +201,32 @@ const Dashboard = ({ user, onLogout }) => {
         ));
         setModalType(null);
         alert(mode === 'PLAYER' ? "¡Te has unido a la pichanga!" : "¡Reto aceptado! Partido listo.");
-      } else {
-        alert("No se pudo procesar la unión.");
       }
     } catch (error) {
       console.error("Error uniendo al match:", error);
-      alert("Error de conexión con el servidor.");
     }
   };
 
+  // ✅ CANCELAR PARTIDO (SOFT DELETE) CORREGIDO
   const handleEliminarPartido = async (e, pId) => {
     e.stopPropagation();
-    if (!window.confirm("¿Deseas eliminar esta partida?")) return;
     try {
-      const res = await fetch(`${API_URL}/partidos/${pId}`, { method: 'DELETE' });
+      // Usamos el nuevo endpoint de cancelación con PATCH
+      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { 
+        method: 'PATCH' 
+      });
+
       if (res.ok) {
+        // Quitamos el partido de la lista local
         setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
+        alert("✅ Partido cancelado exitosamente.");
+      } else {
+        // Si el endpoint no existe aún o falla, podrías tener un fallback a DELETE (opcional)
+        alert("No se pudo cancelar el partido.");
       }
     } catch (error) {
-      alert("No se pudo eliminar.");
+      console.error("Error al cancelar:", error);
+      alert("Error de conexión.");
     }
   };
 
