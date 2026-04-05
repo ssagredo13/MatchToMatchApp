@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.database import recintos_col, format_mongo_doc
 
-router = APIRouter(prefix="/recintos", tags=["Recintos"])
+router = APIRouter(prefix="/api/recintos", tags=["Recintos"])
 
 @router.get("/")
 async def listar_recintos():

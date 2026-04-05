@@ -4,7 +4,7 @@ from typing import Optional, List
 from app.database import partidos_col, format_mongo_doc
 from app.models import Partido
 
-router = APIRouter(prefix="/partidos", tags=["Partidos"])
+router = APIRouter(prefix="/api/partidos", tags=["Partidos"])
 
 @router.get("/")
 async def listar_partidos(email: Optional[str] = None):

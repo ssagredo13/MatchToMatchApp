@@ -1,10 +1,10 @@
+# main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import equipos, partidos, recintos
 
 app = FastAPI(title="Match to Match API")
 
-# CONFIGURACIÓN CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,7 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# REGISTRO DE RUTAS (Aquí conectamos los archivos de la carpeta routes)
+# REGISTRO DE RUTAS LIMPIO
 app.include_router(equipos.router)
 app.include_router(partidos.router)
 app.include_router(recintos.router)
