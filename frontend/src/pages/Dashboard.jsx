@@ -115,6 +115,7 @@ const Dashboard = ({ user, onLogout }) => {
   };
   
   const handleCrearPartida = async () => {
+    console.log("Datos del usuario actual:", user);
     // 1. VALIDACIÓN
     const camposObligatorios = {
       equipoId: "Seleccionar un equipo",
