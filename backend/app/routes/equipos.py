@@ -3,7 +3,7 @@ from typing import Optional
 from app.models import Equipo
 from app.database import equipos_col, format_mongo_doc
 
-router = APIRouter(prefix="/api/equipos", tags=["Equipos"])
+router = APIRouter(prefix="/equipos", tags=["Equipos"])
 
 @router.get("/")
 async def obtener_equipos(email: Optional[str] = None):
