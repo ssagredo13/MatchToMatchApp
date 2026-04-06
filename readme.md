@@ -23,11 +23,12 @@ El ecosistema **Match to Match** utiliza una arquitectura de nube híbrida optim
 * **Clean Code Refactor:** Reducción del 36% en líneas de código, optimizando el rendimiento y la mantenibilidad.
 
 ## 🚀 Instalación y Desarrollo Local
-Para fines de mantenimiento autorizado o auditoría interna, el entorno se gestiona mediante **Docker Compose**:
+Para fines de mantenimiento autorizado o auditoría interna, el entorno se gestiona mediante Docker Compose:
 
-1. **Clonar y configurar:**
-   ```bash
-   git clone [https://github.com/tu-usuario/futbol-connectapp.git](https://github.com/tu-usuario/futbol-connectapp.git)
+Clonar el repositorio:
+
+Bash
+git clone https://github.com/ssagredo13/MatchToMatchApp.git
 Levantar servicios:
 
 Bash
