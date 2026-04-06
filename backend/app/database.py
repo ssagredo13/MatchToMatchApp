@@ -25,6 +25,7 @@ db = client[DB_NAME]
 recintos_col = db.get_collection("recintos")
 equipos_col = db.get_collection("equipos")
 partidos_col = db.get_collection("partidos")
+usuarios_col = db.get_collection("usuarios")
 
 # --- UTILIDADES DE FORMATO ---
 def format_mongo_doc(doc):
