@@ -171,14 +171,23 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  // --- LÓGICA DE SILOS ---
-  const hoyStr = new Date().toLocaleDateString('en-CA');
-  const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
-  const ayerStr = ayer.toLocaleDateString('en-CA');
+  // --- LÓGICA DE SILOS (PASADO, HOY, FUTURO) ---
+  const hoy = new Date();
+  const hoyStr = hoy.toLocaleDateString('en-CA');
+
+  const haceSieteDias = new Date();
+  haceSieteDias.setDate(hoy.getDate() - 7);
+  const haceSieteDiasStr = haceSieteDias.toLocaleDateString('en-CA');
 
   const matchesFiltrados = partidos.filter(p => filtro === 'TODOS' || p.estado === filtro);
+
   const partidasHoy = matchesFiltrados.filter(p => p.fecha === hoyStr);
-  const partidasAyer = matchesFiltrados.filter(p => p.fecha === ayerStr);
+  const partidasFuturas = matchesFiltrados
+    .filter(p => p.fecha > hoyStr)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  const partidasPasadas = matchesFiltrados
+    .filter(p => p.fecha < hoyStr && p.fecha >= haceSieteDiasStr)
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   // --- PROPS PARA MODALES ---
   const modalProps = {
@@ -219,22 +228,65 @@ const Dashboard = ({ user, onLogout }) => {
 
         <MatchFilters filtro={filtro} setFiltro={setFiltro} />
 
-        <MatchSilo 
-          title="Match Center" subtitle="Live / Hoy"
-          matches={partidasHoy} user={user} isAdmin={isAdmin}
-          activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-          setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
-          onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
-        />
+        {/* --- CONTENEDOR DE SILOS --- */}
+        <div className="space-y-20 mb-20">
+          
+          {/* NIVEL 1: HOY (DESTACADO) */}
+          <div className="relative">
+            <div className="absolute -inset-4 bg-[#CCFF00]/5 blur-3xl rounded-[60px] -z-10" />
+            <MatchSilo 
+              title="Match Center" 
+              subtitle="LIVE / HOY"
+              matches={partidasHoy} 
+              user={user} isAdmin={isAdmin}
+              activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
+              setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+              onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+            />
+            {partidasHoy.length === 0 && (
+              <div className="border-2 border-dashed border-white/5 rounded-[40px] py-16 text-center">
+                <p className="text-white/20 font-black italic uppercase tracking-[0.3em] text-sm">
+                  No hay acción para hoy... <span className="text-[#CCFF00]/40">¡Organiza el primero!</span>
+                </p>
+              </div>
+            )}
+          </div>
 
-        <MatchSilo 
-          title="Recientes" subtitle="Ayer"
-          matches={partidasAyer} user={user} isAdmin={isAdmin}
-          className="opacity-60 grayscale-[0.5]"
-          activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-          setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
-          onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
-        />
+          {/* NIVEL 2 Y 3: GRILLA SECUNDARIA */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+            
+            <div className="bg-white/[0.02] p-8 rounded-[48px] border border-white/5 hover:border-[#CCFF00]/20 transition-colors">
+              <MatchSilo 
+                title="Próximamente" 
+                subtitle="CALENDARIO / PLANES"
+                matches={partidasFuturas} 
+                user={user} isAdmin={isAdmin}
+                activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
+                setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+                onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+              />
+              {partidasFuturas.length === 0 && (
+                <p className="text-white/10 italic text-xs uppercase tracking-widest text-center py-10">Sin partidos futuros</p>
+              )}
+            </div>
+
+            <div className="bg-black/40 p-8 rounded-[48px] border border-white/5 opacity-60 hover:opacity-100 transition-opacity">
+              <MatchSilo 
+                title="Historial" 
+                subtitle="RECIENTES / 7 DÍAS"
+                matches={partidasPasadas} 
+                user={user} isAdmin={isAdmin}
+                activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
+                setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+                onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+              />
+              {partidasPasadas.length === 0 && (
+                <p className="text-white/10 italic text-xs uppercase tracking-widest text-center py-10">Historial vacío</p>
+              )}
+            </div>
+
+          </div>
+        </div>
 
         <MatchMapLive
           partidos={matchesFiltrados} 

@@ -1,8 +1,8 @@
 import MatchCard from '../MatchCard';
 
 const MatchSilo = ({ title, subtitle, matches, user, isAdmin, onDelete, onSelect, activeMatchId, setActiveMatchId, setMapCenter, className = "" }) => {
-  if (matches.length === 0) return null;
-
+  //if (matches.length === 0) return null;
+  if (matches.length === 0 && subtitle !== 'LIVE / HOY') return null;
   return (
     <section className={`mb-16 ${className}`}>
       <div className="mb-8">
