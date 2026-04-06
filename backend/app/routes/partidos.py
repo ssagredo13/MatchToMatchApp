@@ -7,11 +7,17 @@ from app.models import Partido
 router = APIRouter(prefix="/api/partidos", tags=["Partidos"])
 
 @router.get("/")
-async def listar_partidos(email: Optional[str] = None):
+async def listar_partidos(email: Optional[str] = None, solo_activos: bool = True):
     partidos = []
-    filtro = {"activo": {"$ne": False}} # Solo los que no están cancelados
+    
+    # Si solo_activos es True, filtramos los que NO son False.
+    # Si es False, no ponemos filtro de 'activo' y traerá todo.
+    filtro = {"activo": {"$ne": False}} if solo_activos else {}
+
     if email:
+        # Si hay email, buscamos los del usuario dentro del filtro previo
         filtro["$or"] = [{"creadorEmail": email}, {"jugadoresInscritos": email}]
+    
     async for p in partidos_col.find(filtro).sort("_id", -1): 
         partidos.append(format_mongo_doc(p))
     return partidos
