@@ -208,12 +208,12 @@ const Dashboard = ({ user, onLogout }) => {
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
       <Navbar user={user} onLogout={onLogout} />
 
-      <main className="pt-36 px-4 md:px-8 max-w-[1400px] mx-auto pb-20">
+      <main className="pt-36 px-4 md:px-8 max-w-[1500px] mx-auto pb-20">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
           <div className="space-y-2">
-            <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Live Talca Hub</h2>
+            <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Talca Hub</h2>
             <h1 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-[0.85]">
-              Partidas <span className="opacity-10">Activas</span>
+              Dashboard <span className="opacity-10">M2M</span>
             </h1>
           </div>
           <button 
@@ -228,66 +228,66 @@ const Dashboard = ({ user, onLogout }) => {
 
         <MatchFilters filtro={filtro} setFiltro={setFiltro} />
 
-        {/* --- CONTENEDOR DE SILOS --- */}
-        <div className="space-y-20 mb-20">
+        {/* --- MAESTRO DE 3 SILOS EN GRILLA HORIZONTAL --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-20">
           
-          {/* NIVEL 1: HOY (DESTACADO - ANCHO COMPLETO) */}
-          <div className="relative w-full">
-            <div className="absolute -inset-4 bg-[#CCFF00]/5 blur-3xl rounded-[60px] -z-10" />
+          {/* COLUMNA 1: HISTORIAL (IZQUIERDA) */}
+          <div className="bg-black/20 p-6 rounded-[40px] border border-white/5 opacity-40 hover:opacity-100 transition-all duration-500 order-2 lg:order-1">
             <MatchSilo 
-              title="Match Center" 
-              subtitle="LIVE / HOY"
-              matches={partidasHoy} 
+              title="Historial" 
+              subtitle="PASADO / 7 DÍAS"
+              matches={partidasPasadas} 
               user={user} isAdmin={isAdmin}
               activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
               setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
               onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
             />
-            {partidasHoy.length === 0 && (
-              <div className="border-2 border-dashed border-white/5 rounded-[40px] py-16 text-center">
-                <p className="text-white/20 font-black italic uppercase tracking-[0.3em] text-sm">
-                  No hay acción para hoy... <span className="text-[#CCFF00]/40">¡Organiza el primero!</span>
-                </p>
-              </div>
+            {partidasPasadas.length === 0 && (
+              <p className="text-white/10 italic text-center py-10 text-[10px] uppercase tracking-widest">Sin registros</p>
             )}
           </div>
 
-          {/* NIVEL 2 Y 3: GRILLA SECUNDARIA (DOS COLUMNAS AMPLIAS) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+          {/* COLUMNA 2: HOY (CENTRO - EL MÁS IMPORTANTE) */}
+          <div className="relative order-1 lg:order-2 lg:scale-105 z-10">
+            {/* Brillo de fondo para resaltar el centro */}
+            <div className="absolute -inset-1 bg-[#CCFF00]/10 blur-2xl rounded-[50px] -z-10" />
             
-            {/* PRÓXIMAMENTE */}
-            <div className="bg-white/[0.02] p-8 rounded-[48px] border border-white/5 hover:border-[#CCFF00]/20 transition-all duration-500">
+            <div className="bg-white/[0.03] p-8 rounded-[48px] border-2 border-[#CCFF00]/20 shadow-2xl">
               <MatchSilo 
-                title="Próximamente" 
-                subtitle="CALENDARIO / PLANES"
-                matches={partidasFuturas} 
+                title="Match Center" 
+                subtitle="LIVE / HOY"
+                matches={partidasHoy} 
                 user={user} isAdmin={isAdmin}
                 activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
                 setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
                 onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
               />
-              {partidasFuturas.length === 0 && (
-                <p className="text-white/10 italic text-xs uppercase tracking-widest text-center py-10">Sin partidos futuros</p>
+              {partidasHoy.length === 0 && (
+                <div className="py-12 text-center border-2 border-dashed border-[#CCFF00]/10 rounded-3xl">
+                  <p className="text-[#CCFF00]/40 font-black italic uppercase tracking-[0.2em] text-xs">
+                    Nada para hoy todavía
+                  </p>
+                </div>
               )}
             </div>
-
-            {/* HISTORIAL */}
-            <div className="bg-black/40 p-8 rounded-[48px] border border-white/5 opacity-60 hover:opacity-100 transition-all duration-500">
-              <MatchSilo 
-                title="Historial" 
-                subtitle="RECIENTES / 7 DÍAS"
-                matches={partidasPasadas} 
-                user={user} isAdmin={isAdmin}
-                activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-                setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
-                onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
-              />
-              {partidasPasadas.length === 0 && (
-                <p className="text-white/10 italic text-xs uppercase tracking-widest text-center py-10">Historial vacío</p>
-              )}
-            </div>
-
           </div>
+
+          {/* COLUMNA 3: PRÓXIMAMENTE (DERECHA) */}
+          <div className="bg-white/[0.02] p-6 rounded-[40px] border border-white/5 hover:border-[#CCFF00]/20 transition-all duration-500 order-3">
+            <MatchSilo 
+              title="Próximamente" 
+              subtitle="FUTURO / AGENDA"
+              matches={partidasFuturas} 
+              user={user} isAdmin={isAdmin}
+              activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
+              setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+              onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+            />
+            {partidasFuturas.length === 0 && (
+              <p className="text-white/10 italic text-center py-10 text-[10px] uppercase tracking-widest">Sin planes futuros</p>
+            )}
+          </div>
+
         </div>
 
         {/* MAPA */}
