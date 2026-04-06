@@ -39,6 +39,7 @@ Para fines de mantenimiento autorizado o auditoría interna, el entorno se gesti
 1. **Clonar el repositorio:**
    ```bash
    git clone [https://github.com/ssagredo13/MatchToMatchApp.git](https://github.com/ssagredo13/MatchToMatchApp.git)
+   
 Levantar servicios:
 
 Bash
@@ -49,6 +50,7 @@ Plaintext
 ├── backend/           # API FastAPI (Hospedado en Render)
 ├── frontend/          # React 18 (Hospedado en Vercel)
 └── docker-compose.yml # Orquestación de red local
+
 📧 Contacto para Licencias: ssagredo13@gmail.com | correlavozchile@gmail.com
 
 Propiedad de Correlavoz Chile.
