@@ -6,7 +6,7 @@ import L from 'leaflet';
 import Navbar from '../components/Navbar';
 import MatchModals from '../components/MatchModals';
 import MatchSilo from '../components/Dashboard/MatchSilo';
-import MatchMap from '../components/Dashboard/MatchMap';
+import MatchMapLive from '../components/Dashboard/MatchMapLive';
 import MatchFilters from '../components/Dashboard/MatchFilters';
 
 // --- CONFIGURACIÓN DE ICONOS LEAFLET ---
@@ -236,7 +236,7 @@ const Dashboard = ({ user, onLogout }) => {
           onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
         />
 
-        <MatchMap 
+        <MatchMapLive
           partidos={matchesFiltrados} 
           mapCenter={mapCenter} 
           activeMatchId={activeMatchId}
