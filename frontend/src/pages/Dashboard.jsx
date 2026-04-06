@@ -82,7 +82,6 @@ const Dashboard = ({ user, onLogout }) => {
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
 
-    // Validación de fecha con hora local
     const [year, month, day] = formPartida.fecha.split('-').map(Number);
     const [hours, minutes] = formPartida.hora.split(':').map(Number);
     const fechaPartida = new Date(year, month - 1, day, hours, minutes);
@@ -130,15 +129,25 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  const handleEliminarPartido = async (e, pId) => {
-    e.stopPropagation();
+  // AJUSTADO: Usa PATCH y la ruta /cancelar de tu partidos.py
+  const handleEliminarPartido = async (pId) => {
     try {
-      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { method: 'PATCH' });
+      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { 
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
       if (res.ok) {
+        // Filtramos localmente para que desaparezca de la vista de inmediato
         setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
+        console.log("✅ Partido cancelado exitosamente (activo: false)");
+      } else {
+        const error = await res.json();
+        alert(`❌ No se pudo cancelar: ${error.detail || 'Error en servidor'}`);
       }
     } catch (error) {
-      console.error("Error al cancelar:", error);
+      console.error("Error de red al cancelar:", error);
+      alert("❌ Error de conexión al intentar cancelar.");
     }
   };
 
@@ -164,10 +173,10 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  // --- LÓGICA DE SILOS: CLASIFICACIÓN Y MUERTE SÚBITA ---
+  // --- LÓGICA DE SILOS ---
   const ahora = new Date();
   const hoyStr = ahora.toLocaleDateString('en-CA');
-  const LIMITE_MINUTOS = 30; // Margen para confirmar
+  const LIMITE_MINUTOS = 30;
 
   const matchesFiltrados = partidos.filter(p => filtro === 'TODOS' || p.estado === filtro);
 
@@ -180,7 +189,6 @@ const Dashboard = ({ user, onLogout }) => {
     const [h, min] = p.hora.split(':').map(Number);
     const fechaMatch = new Date(y, m - 1, d, h, min);
 
-    // Muerte súbita: 30 minutos antes del inicio
     const limiteConfirmacion = new Date(fechaMatch.getTime() - LIMITE_MINUTOS * 60000);
     const esFallida = ahora > limiteConfirmacion && p.estado !== 'PARTIDO LISTO';
     const yaPaso = ahora > fechaMatch;
@@ -197,7 +205,6 @@ const Dashboard = ({ user, onLogout }) => {
     }
   });
 
-  // Ordenar cronológicamente
   partidasHoy.sort((a, b) => a.hora.localeCompare(b.hora));
   partidasFuturas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
   partidasPasadas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
@@ -254,7 +261,6 @@ const Dashboard = ({ user, onLogout }) => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-20">
           
-          {/* SILO: HISTORIAL */}
           <div className="bg-black/20 p-6 rounded-[40px] border border-white/5 opacity-40 hover:opacity-100 transition-all duration-500 order-2 lg:order-1">
             <MatchSilo 
               title="Historial" 
@@ -262,16 +268,16 @@ const Dashboard = ({ user, onLogout }) => {
               matches={partidasPasadas.slice(0, 8)} 
               user={user} isAdmin={isAdmin}
               activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-              setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+              setMapCenter={setMapCenter} 
+              onDelete={handleEliminarPartido}
               onSelect={(m) => { 
-                if (m.estadoEspecial === 'FALLIDA') return; // BLOQUEO TOTAL
+                if (m.estadoEspecial === 'FALLIDA') return;
                 setSelectedPartido(m); 
                 setModalType('UNIRSE'); 
               }}
             />
           </div>
 
-          {/* SILO: MATCH CENTER (HOY) */}
           <div className="relative order-1 lg:order-2 lg:scale-105 z-10">
             <div className="absolute -inset-1 bg-[#CCFF00]/10 blur-2xl rounded-[50px] -z-10" />
             <div className="bg-white/[0.03] p-8 rounded-[48px] border-2 border-[#CCFF00]/20 shadow-2xl">
@@ -281,12 +287,13 @@ const Dashboard = ({ user, onLogout }) => {
                 matches={partidasHoy} 
                 user={user} isAdmin={isAdmin}
                 activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-                setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+                setMapCenter={setMapCenter} 
+                onDelete={handleEliminarPartido}
                 onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
               />
               {partidasHoy.length === 0 && (
                 <div className="py-12 text-center border-2 border-dashed border-[#CCFF00]/10 rounded-3xl">
-                  <p className="text-[#CCFF00]/40 font-black italic uppercase tracking-[0.2em] text-xs italic">
+                  <p className="text-[#CCFF00]/40 font-black italic uppercase tracking-[0.2em] text-xs">
                     Nada para hoy todavía
                   </p>
                 </div>
@@ -294,7 +301,6 @@ const Dashboard = ({ user, onLogout }) => {
             </div>
           </div>
 
-          {/* SILO: PRÓXIMAMENTE */}
           <div className="bg-white/[0.02] p-6 rounded-[40px] border border-white/5 hover:border-[#CCFF00]/20 transition-all duration-500 order-3">
             <MatchSilo 
               title="Próximamente" 
@@ -302,7 +308,8 @@ const Dashboard = ({ user, onLogout }) => {
               matches={partidasFuturas} 
               user={user} isAdmin={isAdmin}
               activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-              setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+              setMapCenter={setMapCenter} 
+              onDelete={handleEliminarPartido}
               onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
             />
           </div>
