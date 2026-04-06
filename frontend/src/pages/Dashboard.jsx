@@ -72,33 +72,26 @@ const Dashboard = ({ user, onLogout }) => {
   }, [user.email, API_URL]);
 
   useEffect(() => {
-    const intervalo = setInterval(cargarPartidas, 20000);
+    const intervalo = setInterval(cargarPartidas, 30000);
     return () => clearInterval(intervalo);
   }, []);
 
   // --- HANDLERS ---
-  const handleCrearEquipoDB = async (nombreNuevo) => {
-    const nuevo = { nombre: nombreNuevo, creadorEmail: user.email };
-    try {
-      const res = await fetch(`${API_URL}/equipos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevo)
-      });
-      if (res.ok) {
-        const guardado = await res.json();
-        setMisEquipos(prev => [...prev, guardado]);
-        return guardado;
-      }
-    } catch (e) {
-      alert("❌ Error al guardar el equipo");
-    }
-  };
-  
   const handleCrearPartida = async () => {
     const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
+
+    // Validación de fecha con hora local
+    const [year, month, day] = formPartida.fecha.split('-').map(Number);
+    const [hours, minutes] = formPartida.hora.split(':').map(Number);
+    const fechaPartida = new Date(year, month - 1, day, hours, minutes);
+    const ahora = new Date();
+
+    if (fechaPartida < ahora) {
+      alert("❌ No puedes organizar un partido para el pasado. ¡Ajusta el reloj, capitán!");
+      return;
+    }
 
     const nuevaPartida = {
       equipo: eq?.nombre || "Sin Equipo",
@@ -137,6 +130,18 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
+  const handleEliminarPartido = async (e, pId) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { method: 'PATCH' });
+      if (res.ok) {
+        setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
+      }
+    } catch (error) {
+      console.error("Error al cancelar:", error);
+    }
+  };
+
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
     try {
       const payload = mode === 'PLAYER' 
@@ -159,42 +164,61 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  const handleEliminarPartido = async (e, pId) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { method: 'PATCH' });
-      if (res.ok) {
-        setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
-      }
-    } catch (error) {
-      console.error("Error al cancelar:", error);
-    }
-  };
-
-  // --- LÓGICA DE SILOS (PASADO, HOY, FUTURO) ---
-  const hoy = new Date();
-  const hoyStr = hoy.toLocaleDateString('en-CA');
-
-  const haceSieteDias = new Date();
-  haceSieteDias.setDate(hoy.getDate() - 7);
-  const haceSieteDiasStr = haceSieteDias.toLocaleDateString('en-CA');
+  // --- LÓGICA DE SILOS: CLASIFICACIÓN Y MUERTE SÚBITA ---
+  const ahora = new Date();
+  const hoyStr = ahora.toLocaleDateString('en-CA');
+  const LIMITE_MINUTOS = 30; // Margen para confirmar
 
   const matchesFiltrados = partidos.filter(p => filtro === 'TODOS' || p.estado === filtro);
 
-  const partidasHoy = matchesFiltrados.filter(p => p.fecha === hoyStr);
-  const partidasFuturas = matchesFiltrados
-    .filter(p => p.fecha > hoyStr)
-    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-  const partidasPasadas = matchesFiltrados
-    .filter(p => p.fecha < hoyStr && p.fecha >= haceSieteDiasStr)
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const partidasPasadas = [];
+  const partidasHoy = [];
+  const partidasFuturas = [];
 
-  // --- PROPS PARA MODALES ---
+  matchesFiltrados.forEach(p => {
+    const [y, m, d] = p.fecha.split('-').map(Number);
+    const [h, min] = p.hora.split(':').map(Number);
+    const fechaMatch = new Date(y, m - 1, d, h, min);
+
+    // Muerte súbita: 30 minutos antes del inicio
+    const limiteConfirmacion = new Date(fechaMatch.getTime() - LIMITE_MINUTOS * 60000);
+    const esFallida = ahora > limiteConfirmacion && p.estado !== 'PARTIDO LISTO';
+    const yaPaso = ahora > fechaMatch;
+
+    if (p.fecha < hoyStr || yaPaso || esFallida) {
+      partidasPasadas.push({
+        ...p,
+        estadoEspecial: esFallida && !yaPaso ? 'FALLIDA' : null
+      });
+    } else if (p.fecha === hoyStr) {
+      partidasHoy.push(p);
+    } else {
+      partidasFuturas.push(p);
+    }
+  });
+
+  // Ordenar cronológicamente
+  partidasHoy.sort((a, b) => a.hora.localeCompare(b.hora));
+  partidasFuturas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  partidasPasadas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
   const modalProps = {
     user, modalType, setModalType, selectedPartido, handleUnirseMatch,
     misEquipos, step, setStep, formPartida, setFormPartida,
     handleCrearPartida, nuevoEquipo, setNuevoEquipo, setMisEquipos,
-    recintosOficiales, handleCrearEquipoDB
+    recintosOficiales, handleCrearEquipoDB: async (n) => {
+        const nuevo = { nombre: n, creadorEmail: user.email };
+        const res = await fetch(`${API_URL}/equipos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(nuevo)
+        });
+        if (res.ok) {
+            const g = await res.json();
+            setMisEquipos(prev => [...prev, g]);
+            return g;
+        }
+    }
   };
 
   if (loading) return (
@@ -228,30 +252,24 @@ const Dashboard = ({ user, onLogout }) => {
 
         <MatchFilters filtro={filtro} setFiltro={setFiltro} />
 
-        {/* --- MAESTRO DE 3 SILOS EN GRILLA HORIZONTAL --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-20">
           
-          {/* COLUMNA 1: HISTORIAL (IZQUIERDA) */}
+          {/* SILO: HISTORIAL */}
           <div className="bg-black/20 p-6 rounded-[40px] border border-white/5 opacity-40 hover:opacity-100 transition-all duration-500 order-2 lg:order-1">
             <MatchSilo 
               title="Historial" 
-              subtitle="PASADO / 7 DÍAS"
-              matches={partidasPasadas} 
+              subtitle="PASADO / RECIENTE"
+              matches={partidasPasadas.slice(0, 8)} 
               user={user} isAdmin={isAdmin}
               activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
               setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
               onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
             />
-            {partidasPasadas.length === 0 && (
-              <p className="text-white/10 italic text-center py-10 text-[10px] uppercase tracking-widest">Sin registros</p>
-            )}
           </div>
 
-          {/* COLUMNA 2: HOY (CENTRO - EL MÁS IMPORTANTE) */}
+          {/* SILO: MATCH CENTER (HOY) */}
           <div className="relative order-1 lg:order-2 lg:scale-105 z-10">
-            {/* Brillo de fondo para resaltar el centro */}
             <div className="absolute -inset-1 bg-[#CCFF00]/10 blur-2xl rounded-[50px] -z-10" />
-            
             <div className="bg-white/[0.03] p-8 rounded-[48px] border-2 border-[#CCFF00]/20 shadow-2xl">
               <MatchSilo 
                 title="Match Center" 
@@ -264,7 +282,7 @@ const Dashboard = ({ user, onLogout }) => {
               />
               {partidasHoy.length === 0 && (
                 <div className="py-12 text-center border-2 border-dashed border-[#CCFF00]/10 rounded-3xl">
-                  <p className="text-[#CCFF00]/40 font-black italic uppercase tracking-[0.2em] text-xs">
+                  <p className="text-[#CCFF00]/40 font-black italic uppercase tracking-[0.2em] text-xs italic">
                     Nada para hoy todavía
                   </p>
                 </div>
@@ -272,7 +290,7 @@ const Dashboard = ({ user, onLogout }) => {
             </div>
           </div>
 
-          {/* COLUMNA 3: PRÓXIMAMENTE (DERECHA) */}
+          {/* SILO: PRÓXIMAMENTE */}
           <div className="bg-white/[0.02] p-6 rounded-[40px] border border-white/5 hover:border-[#CCFF00]/20 transition-all duration-500 order-3">
             <MatchSilo 
               title="Próximamente" 
@@ -283,14 +301,9 @@ const Dashboard = ({ user, onLogout }) => {
               setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
               onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
             />
-            {partidasFuturas.length === 0 && (
-              <p className="text-white/10 italic text-center py-10 text-[10px] uppercase tracking-widest">Sin planes futuros</p>
-            )}
           </div>
-
         </div>
 
-        {/* MAPA */}
         <MatchMapLive
           partidos={matchesFiltrados} 
           mapCenter={mapCenter} 
