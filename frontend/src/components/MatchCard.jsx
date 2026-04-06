@@ -1,10 +1,12 @@
 import React from 'react';
-import { Users, Settings2, Crown, Lock } from 'lucide-react';
+import { Users, Settings2, Crown, Lock, Trash2, UserPlus } from 'lucide-react';
 
-const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, user }) => {
-  const isHost = partido.creadorEmail === user?.email;
+const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, user }) => {
+  // Verificamos si el usuario actual es el dueño de la pichanga
+  // Usamos creadorEmail que es el campo que vimos en tu Atlas
+  const isHost = user?.email && partido.creadorEmail === user.email;
   
-  // Lógica de expiración en tiempo real (evita que gestiones partidos que ya pasaron)
+  // Lógica de expiración
   const ahora = new Date();
   const fechaPartido = new Date(`${partido.fecha}T${partido.hora}`);
   const yaPaso = ahora > fechaPartido;
@@ -26,7 +28,7 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, user }) => 
             : 'bg-[#0f172a]/40 border-white/5 hover:border-white/20 hover:bg-[#0f172a]/60 cursor-pointer'}
       `}
     >
-      {/* ESCUDO DE SEGURIDAD: Bloquea clics físicos y burbujeo de eventos si la partida expiró */}
+      {/* ESCUDO DE SEGURIDAD */}
       {esFallida && (
         <div 
           className="absolute inset-0 z-[100] cursor-not-allowed bg-transparent" 
@@ -56,7 +58,7 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, user }) => 
           </h3>
           
           <div className="flex items-center gap-1.5 mt-3">
-            <Crown size={10} className={isHost && !esFallida ? "text-[#CCFF00]" : "text-slate-700"} />
+            <Crown size={12} className={isHost && !esFallida ? "text-[#CCFF00]" : "text-slate-700"} />
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
               Organiza: <span className={esFallida ? "text-slate-600" : "text-white italic"}>{partido.creadorNombre || 'Organizador'}</span>
             </span>
@@ -70,7 +72,7 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, user }) => 
               ? 'bg-green-500/10 text-green-400 border-green-500/20' 
               : 'bg-[#CCFF00]/10 text-[#CCFF00] border-[#CCFF00]/20'
         }`}>
-          {esFallida ? 'PARTIDA EXPIRADA' : partido.estado}
+          {esFallida ? 'EXPIRADA' : partido.estado}
         </span>
       </div>
 
@@ -97,19 +99,44 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, user }) => 
           </div>
           <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
             <div 
-              className={`h-full ${esFallida ? 'bg-slate-800' : 'bg-[#CCFF00]'}`}
+              className={`h-full transition-all duration-1000 ${esFallida ? 'bg-slate-800' : 'bg-[#CCFF00]'}`}
               style={{ width: `${(partido.jugadores / partido.total) * 100}%` }}
             />
           </div>
         </div>
 
-        <div className={`h-11 px-6 rounded-xl font-black italic uppercase text-[10px] flex items-center gap-2 border 
-          ${esFallida 
-            ? 'bg-transparent text-slate-700 border-white/5' 
-            : isHost 
-              ? 'bg-cyan-500 text-black border-cyan-400' 
-              : 'bg-white text-black border-white'}`}>
-          {esFallida ? <><Lock size={14}/> Cerrada</> : isHost ? <><Settings2 size={14}/> Gestionar</> : 'Unirse'}
+        <div className="flex items-center gap-2">
+          {/* BOTÓN ELIMINAR: Solo para el Organizador */}
+          {isHost && !esFallida && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if(window.confirm("¿Estás seguro de cancelar esta pichanga?")) {
+                  onDelete(partido.id || partido._id);
+                }
+              }}
+              className="h-11 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 transition-colors"
+              title="Eliminar Partida"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
+
+          {/* BOTÓN PRINCIPAL ACCIÓN */}
+          <div className={`h-11 px-6 rounded-xl font-black italic uppercase text-[10px] flex items-center gap-2 border transition-all
+            ${esFallida 
+              ? 'bg-transparent text-slate-700 border-white/5' 
+              : isHost 
+                ? 'bg-cyan-500 text-black border-cyan-400 hover:bg-cyan-400' 
+                : 'bg-white text-black border-white hover:bg-[#CCFF00] hover:border-[#CCFF00]'}`}>
+            {esFallida ? (
+              <><Lock size={14}/> Cerrada</>
+            ) : isHost ? (
+              <><Settings2 size={14}/> Gestionar</>
+            ) : (
+              <><UserPlus size={14}/> Unirse</>
+            )}
+          </div>
         </div>
       </div>
     </div>
