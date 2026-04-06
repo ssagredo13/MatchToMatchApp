@@ -38,6 +38,7 @@ Plaintext
 ├── backend/           # API FastAPI (Hospedado en Render)
 ├── frontend/          # React 18 (Hospedado en Vercel)
 └── docker-compose.yml # Orquestación local
+
 Contacto para Licencias: ssagredo13@gmail.com / correlavhozchile@gmail.com
 
 Propiedad de Correlavoz Chile.
