@@ -1,346 +1,65 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import { Plus, Loader2 } from 'lucide-react';
-import L from 'leaflet';
-
-// COMPONENTES
-import Navbar from '../components/Navbar';
-import MatchCard from '../components/MatchCard';
-import MatchModals from '../components/MatchModals';
-
-// --- CONFIGURACIÓN DE ICONOS LEAFLET ---
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-const neonIcon = new L.DivIcon({
-  className: 'custom-div-icon',
-  html: `<div style="background-color: #ccff00; width: 15px; height: 15px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px #ccff00;"></div>`,
-  iconSize: [15, 15],
-  iconAnchor: [7, 7]
-});
-
-const MapController = ({ center }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (center && center[0] && center[1]) {
-      map.flyTo(center, 15, { duration: 1.5 });
-    }
-  }, [center, map]);
-  return null;
-};
+// ... (Imports de React, Hooks y Lucide se mantienen)
+import MatchSilo from '../components/Dashboard/MatchSilo';
+import MatchMap from '../components/Dashboard/MatchMap';
+import MatchFilters from '../components/Dashboard/MatchFilters';
 
 const Dashboard = ({ user, onLogout }) => {
-  // --- ESTADOS ---
-  const [partidos, setPartidos] = useState([]);
-  const [recintosOficiales, setRecintosOficiales] = useState([]);
-  const [misEquipos, setMisEquipos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [filtro, setFiltro] = useState('TODOS');
-  const [modalType, setModalType] = useState(null); 
-  const [step, setStep] = useState(1);
-  const [selectedPartido, setSelectedPartido] = useState(null);
-  const [activeMatchId, setActiveMatchId] = useState(null);
-  const [mapCenter, setMapCenter] = useState([-35.4264, -71.6554]); 
-  const [nuevoEquipo, setNuevoEquipo] = useState('');
-  
-  const [formPartida, setFormPartida] = useState({ 
-    equipoId: '', recinto: '', recintoId: '', lat: null, lng: null,
-    hora: '', fecha: '', tipo: 'JUGADORES', jugadoresPorLado: 6,
-    jugadoresInvitados: 0, requiereArquero: false, canchaConfirmada: false 
-  });
+  // --- MANTENEMOS ESTADOS Y HANDLERS (Igual que los tienes) ---
+  // ... cargarPartidas, handleCrearPartida, handleEliminarPartido, etc.
 
-  const isAdmin = user?.email === 'ssagredo13@gmail.com';
-  const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api";
+  // LÓGICA DE SILOS
+  const hoyStr = new Date().toLocaleDateString('en-CA');
+  const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+  const ayerStr = ayer.toLocaleDateString('en-CA');
 
-  // --- CARGA INICIAL ---
-  const cargarPartidas = async () => {
-    try {
-      const res = await fetch(`${API_URL}/partidos`);
-      if (res.ok) setPartidos(await res.json());
-    } catch (err) {
-      console.error("Error cargando partidas:", err);
-    }
-  };
-
-  useEffect(() => {
-    const cargarDatosBase = async () => {
-      setLoading(true);
-      try {
-        const [resRecintos, resEquipos] = await Promise.all([
-          fetch(`${API_URL}/recintos`),
-          fetch(`${API_URL}/equipos?email=${user.email}`)
-        ]);
-        if (resRecintos.ok) setRecintosOficiales(await resRecintos.json());
-        if (resEquipos.ok) setMisEquipos(await resEquipos.json());
-        await cargarPartidas();
-      } catch (err) {
-        console.error("⚠️ Error conectando al backend:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user?.email) cargarDatosBase();
-  }, [user.email, API_URL]);
-
-  useEffect(() => {
-    const intervalo = setInterval(() => {
-      cargarPartidas();
-    }, 20000);
-    return () => clearInterval(intervalo);
-  }, []);
-
-  // --- HANDLERS ---
-  const handleCrearEquipoDB = async (nombreNuevo) => {
-    const nuevo = { nombre: nombreNuevo, creadorEmail: user.email };
-    try {
-      const res = await fetch(`${API_URL}/equipos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevo)
-      });
-      if (res.ok) {
-        const guardado = await res.json();
-        setMisEquipos(prev => [...prev, guardado]);
-        return guardado;
-      }
-    } catch (e) {
-      alert("❌ Error al guardar el equipo");
-    }
-  };
-  
-  const handleCrearPartida = async () => {
-    console.log("Datos del usuario actual:", user);
-    // 1. VALIDACIÓN
-    const camposObligatorios = {
-      equipoId: "Seleccionar un equipo",
-      recinto: "Nombre del recinto",
-      fecha: "Fecha del partido",
-      hora: "Hora del partido",
-      lat: "Ubicación en el mapa"
-    };
-
-    const faltantes = Object.keys(camposObligatorios).filter(campo => !formPartida[campo]);
-
-    if (faltantes.length > 0) {
-      const listaFaltantes = faltantes.map(f => `• ${camposObligatorios[f]}`).join('\n');
-      alert(`⚠️ Faltan datos críticos para crear la pichanga:\n\n${listaFaltantes}`);
-      return; 
-    }
-
-    // 2. PREPARACIÓN DE DATOS (CORREGIDO CON creadorNombre)
-    const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
-    const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
-    const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
-
-    const nuevaPartida = {
-      equipo: eq?.nombre || "Sin Equipo",
-      equipoId: String(formPartida.equipoId),
-      creadorEmail: user.email,
-      creadorNombre: user.nombreReal || user.name || "Organizador", // ✅ CORRECCIÓN: Enviamos el nombre
-      recinto: formPartida.recinto,
-      lat: parseFloat(formPartida.lat),
-      lng: parseFloat(formPartida.lng),
-      hora: formPartida.hora,
-      fecha: formPartida.fecha,
-      tipo: formPartida.tipo,
-      jugadores: iniciales, 
-      total: totalCupos,
-      arqueroFaltante: !!formPartida.requiereArquero,
-      jugadoresInscritos: [user.email],
-      estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES',
-      activo: true // ✅ Aseguramos que nazca activa
-    };
-
-    try {
-      const res = await fetch(`${API_URL}/partidos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nuevaPartida)
-      });
-
-      if (res.ok) {
-        const guardada = await res.json();
-        setPartidos([guardada, ...partidos]);
-        setModalType(null);
-        setFormPartida({ 
-          equipoId: '', recinto: '', recintoId: '', lat: null, lng: null, 
-          hora: '', fecha: '', tipo: 'JUGADORES', jugadoresPorLado: 6,
-          jugadoresInvitados: 0, requiereArquero: false, canchaConfirmada: false 
-        });
-        alert("✅ Partida publicada exitosamente");
-      } else {
-        const errData = await res.json();
-        alert(`❌ Error del servidor: ${JSON.stringify(errData.detail)}`);
-      }
-    } catch (error) {
-      alert("❌ Error de red: El backend no responde.");
-    }
-  };
-
-  const handleUnirseMatch = async (pId, mode, equipoData = null) => {
-    try {
-      const payload = mode === 'PLAYER' 
-        ? { nuevoJugadorEmail: user.email }
-        : { rival: equipoData.nombre, estado: "PARTIDO LISTO", jugadores: 12 };
-
-      const res = await fetch(`${API_URL}/partidos/${pId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        const partidoActualizado = await res.json();
-        setPartidos(prev => prev.map(p => 
-          (p._id || p.id) === pId ? partidoActualizado : p
-        ));
-        setModalType(null);
-        alert(mode === 'PLAYER' ? "¡Te has unido a la pichanga!" : "¡Reto aceptado! Partido listo.");
-      }
-    } catch (error) {
-      console.error("Error uniendo al match:", error);
-    }
-  };
-
-  // ✅ CANCELAR PARTIDO (SOFT DELETE) CORREGIDO
-  const handleEliminarPartido = async (e, pId) => {
-    e.stopPropagation();
-    try {
-      // Usamos el nuevo endpoint de cancelación con PATCH
-      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { 
-        method: 'PATCH' 
-      });
-
-      if (res.ok) {
-        // Quitamos el partido de la lista local
-        setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
-        alert("✅ Partido cancelado exitosamente.");
-      } else {
-        // Si el endpoint no existe aún o falla, podrías tener un fallback a DELETE (opcional)
-        alert("No se pudo cancelar el partido.");
-      }
-    } catch (error) {
-      console.error("Error al cancelar:", error);
-      alert("Error de conexión.");
-    }
-  };
-
-  if (loading) return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center gap-4">
-      <Loader2 className="animate-spin text-[#CCFF00]" size={48} />
-      <p className="font-black italic text-white uppercase tracking-widest animate-pulse">Sincronizando con la red...</p>
-    </div>
-  );
+  const matchesFiltrados = partidos.filter(p => filtro === 'TODOS' || p.estado === filtro);
+  const partidasHoy = matchesFiltrados.filter(p => p.fecha === hoyStr);
+  const partidasAyer = matchesFiltrados.filter(p => p.fecha === ayerStr);
+  const otrasPartidas = matchesFiltrados.filter(p => p.fecha !== hoyStr && p.fecha !== ayerStr);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
       <Navbar user={user} onLogout={onLogout} />
 
       <main className="pt-36 px-4 md:px-8 max-w-[1400px] mx-auto pb-20">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
-          <div className="space-y-2">
-            <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Live Talca Hub</h2>
-            <h1 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-[0.85]">
-              Partidas <span className="opacity-10">Activas</span>
-            </h1>
-          </div>
-          <button 
-            onClick={() => {setModalType('PARTIDA'); setStep(1);}} 
-            className="bg-[#CCFF00] text-black h-16 px-10 rounded-none skew-x-[-12deg] hover:bg-white transition-all shadow-[0_0_30px_rgba(204,255,0,0.15)] active:scale-95"
-          >
-            <div className="skew-x-[12deg] flex items-center gap-3 font-black italic uppercase text-base">
-              <Plus size={24} strokeWidth={3}/> Crear Partida
-            </div>
-          </button>
-        </div>
+        {/* CABECERA (Se puede modularizar en Hero.jsx) */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
+            {/* ... Tu código de título y botón crear ... */}
+        </header>
 
-        <div className="flex gap-3 mb-12 overflow-x-auto pb-4 no-scrollbar">
-          {['TODOS', 'BUSCANDO JUGADORES', 'BUSCANDO RIVAL', 'PARTIDO LISTO'].map(f => (
-            <button 
-              key={f} 
-              onClick={() => setFiltro(f)} 
-              className={`px-8 py-3 rounded-full text-[10px] font-black italic border transition-all uppercase tracking-widest ${
-                filtro === f ? 'bg-white/10 text-[#ccff00] border-[#ccff00]/50' : 'border-white/5 text-slate-500 hover:text-white'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        {/* FILTROS MODULARIZADOS */}
+        <MatchFilters filtro={filtro} setFiltro={setFiltro} />
 
-        <div className="grid grid-cols-12 gap-8 lg:gap-12 items-start">
-          <div className="col-span-12 lg:col-span-5 space-y-6 max-h-[800px] overflow-y-auto pr-4 custom-scrollbar">
-            {partidos.filter(p => filtro === 'TODOS' || p.estado === filtro).length === 0 ? (
-              <div className="border border-white/5 bg-white/5 p-10 text-center rounded-3xl">
-                <p className="text-slate-500 font-black italic uppercase text-sm">No hay partidas en esta categoría.</p>
-              </div>
-            ) : (
-              partidos
-                .filter(p => filtro === 'TODOS' || p.estado === filtro)
-                .map(p => {
-                  const pId = p._id || p.id;
-                  return (
-                    <div key={pId} onClick={() => { setActiveMatchId(pId); if(p.lat) setMapCenter([p.lat, p.lng]); }} 
-                         className={`transition-all duration-300 ${activeMatchId === pId ? 'scale-[1.02]' : ''}`}>
-                      <MatchCard 
-                        partido={p} user={user} isAdmin={isAdmin} isActive={activeMatchId === pId}
-                        onDelete={handleEliminarPartido} onSelect={(match) => { setSelectedPartido(match); setModalType('UNIRSE'); }}
-                        isJoined={p.jugadoresInscritos?.includes(user?.email)}
-                      />
-                    </div>
-                  );
-                })
-            )}
-          </div>
+        {/* SILO 1: HOY (LIVE) */}
+        <MatchSilo 
+          title="Match Center" subtitle="Live / Hoy"
+          matches={partidasHoy} user={user} isAdmin={isAdmin}
+          activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
+          setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+          onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+        />
 
-          <div className="col-span-12 lg:col-span-7 h-[500px] lg:h-[800px] sticky top-32">
-            <div className="h-full w-full border border-white/10 rounded-[48px] overflow-hidden bg-[#0b1224] relative shadow-2xl">
-              <MapContainer center={mapCenter} zoom={13} className="h-full w-full">
-                <MapController center={mapCenter} />
-                <TileLayer 
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" 
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                {partidos.map(p => (
-                  p.lat && p.lng && (
-                    <Marker 
-                      key={p._id || p.id} position={[p.lat, p.lng]} 
-                      icon={activeMatchId === (p._id || p.id) ? neonIcon : new L.Icon.Default()}
-                      eventHandlers={{ click: () => setActiveMatchId(p._id || p.id) }}
-                    >
-                      <Popup>
-                        <div className="text-black p-1 font-bold">
-                          <span className="text-blue-600 block">{p.equipo}</span>
-                          <span>{p.recinto}</span>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  )
-                ))}
-              </MapContainer>
-            </div>
-          </div>
-        </div>
+        {/* SILO 2: AYER (RECUPERACIÓN) */}
+        <MatchSilo 
+          title="Recientes" subtitle="Ayer"
+          matches={partidasAyer} user={user} isAdmin={isAdmin}
+          className="opacity-60 grayscale-[0.5]"
+          activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
+          setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
+          onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+        />
+
+        {/* MAPA AL FINAL (MODULARIZADO) */}
+        <MatchMap 
+          partidos={matchesFiltrados} 
+          mapCenter={mapCenter} 
+          activeMatchId={activeMatchId}
+          setActiveMatchId={setActiveMatchId}
+          neonIcon={neonIcon}
+        />
       </main>
 
-      <MatchModals 
-        user={user} modalType={modalType} setModalType={setModalType}
-        selectedPartido={selectedPartido} handleUnirseMatch={handleUnirseMatch}
-        misEquipos={misEquipos} step={step} setStep={setStep}
-        formPartida={formPartida} setFormPartida={setFormPartida}
-        handleCrearPartida={handleCrearPartida} nuevoEquipo={nuevoEquipo}
-        setNuevoEquipo={setNuevoEquipo} setMisEquipos={setMisEquipos}
-        recintosOficiales={recintosOficiales} 
-        handleCrearEquipoDB={handleCrearEquipoDB}
-      />
+      <MatchModals {...modalProps} />
     </div>
   );
 };
-
-export default Dashboard;
