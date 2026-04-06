@@ -2,13 +2,18 @@ import React from 'react';
 import { Clock, MapPin, Users, Trash2, Settings2, Crown } from 'lucide-react';
 
 const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, user }) => {
-  // Verificamos si el usuario actual es el creador de esta pichanga
+  // Verificamos si el usuario actual es el creador
   const isHost = partido.creadorEmail === user?.email;
+
+  // Formateo de fecha para el Badge (Ej: 05 ABR)
+  const fechaObj = new Date(partido.fecha + 'T00:00:00');
+  const dia = fechaObj.toLocaleDateString('es-CL', { day: '2-digit' });
+  const mes = fechaObj.toLocaleDateString('es-CL', { month: 'short' }).replace('.', '').toUpperCase();
 
   return (
     <div 
       className={`
-        relative p-8 rounded-[32px] border transition-all duration-500 cursor-pointer overflow-hidden group
+        relative p-6 rounded-[32px] border transition-all duration-500 cursor-pointer overflow-hidden group
         ${isActive 
           ? 'bg-[#0f172a] border-[#CCFF00] shadow-[0_0_40px_rgba(204,255,0,0.15)] scale-[1.02]' 
           : 'bg-[#0f172a]/40 border-white/5 hover:border-white/20 hover:bg-[#0f172a]/60'}
@@ -20,7 +25,7 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
       )}
 
       {/* HEADER: EQUIPOS Y ESTADO */}
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex justify-between items-start mb-6">
         <div className="space-y-1">
           <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter leading-[0.9]">
             {partido.equipo} 
@@ -32,7 +37,6 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
             )}
           </h3>
           
-          {/* NOMBRE DEL ORGANIZADOR DESTACADO */}
           <div className="flex flex-col gap-1 mt-3">
             <div className="flex items-center gap-1.5">
               <Crown size={10} className={isHost ? "text-[#CCFF00]" : "text-slate-500"} />
@@ -40,12 +44,6 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
                 Organiza: <span className="text-white italic">{partido.creadorNombre || 'Organizador'}</span>
               </span>
             </div>
-            
-            {isHost && (
-              <span className="inline-block w-fit text-[7px] font-black bg-[#CCFF00] text-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-[0_0_10px_rgba(204,255,0,0.3)]">
-                Tu Organización
-              </span>
-            )}
           </div>
         </div>
         
@@ -57,47 +55,47 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
           }`}>
             {partido.estado}
           </span>
-          {isJoined && !isHost && (
-            <span className="text-[8px] font-black text-[#CCFF00] uppercase tracking-widest bg-white/5 px-2 py-1 rounded">
-              ✓ Estás inscrito
-            </span>
-          )}
         </div>
       </div>
 
-      {/* DATA GRID: INFO DE LA PICHANGA */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-white/5 rounded-xl text-slate-400">
-            <Clock size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase">Hora y Fecha</p>
-            <p className="text-xs font-black italic uppercase text-white">{partido.hora} — {partido.fecha}</p>
-          </div>
+      {/* --- SECCIÓN DE FECHA Y HORA (REDISEÑADA ALTO CONTRASTE) --- */}
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 bg-[#CCFF00] p-3 rounded-2xl flex flex-col items-center justify-center shadow-[0_8px_20px_rgba(204,255,0,0.15)] transition-transform group-hover:scale-105">
+          <span className="text-[9px] font-black uppercase text-black/50 leading-none">Fecha</span>
+          <span className="text-xl font-black italic text-black leading-none mt-1">
+            {dia} {mes}
+          </span>
         </div>
+        
+        <div className="flex-1 bg-white/5 border border-white/10 p-3 rounded-2xl flex flex-col items-center justify-center">
+          <span className="text-[9px] font-black uppercase text-[#CCFF00] leading-none tracking-widest">Cita</span>
+          <span className="text-xl font-black italic text-white leading-none mt-1">
+            {partido.hora}
+          </span>
+        </div>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-white/5 rounded-xl text-slate-400">
-            <MapPin size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-500 uppercase">Recinto</p>
-            <p className="text-xs font-black italic uppercase text-white truncate max-w-[120px]">
-              {partido.recinto || partido.cancha}
-            </p>
-          </div>
+      {/* BLOQUE DE RECINTO */}
+      <div className="flex items-center gap-3 bg-black/40 p-4 rounded-2xl border border-white/5 mb-6">
+        <div className="p-2 bg-white/5 rounded-lg text-[#CCFF00]">
+          <MapPin size={18} />
+        </div>
+        <div className="flex flex-col overflow-hidden">
+          <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em]">Recinto</span>
+          <span className="text-xs font-black italic uppercase text-white truncate">
+            {partido.recinto || "Por confirmar"}
+          </span>
         </div>
       </div>
 
       {/* FOOTER: PROGRESO Y ACCIONES */}
-      <div className="flex items-center justify-between gap-6">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex-1 space-y-2">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Users size={14} className="text-[#CCFF00]" />
-              <span className="text-[10px] font-black italic uppercase tracking-widest">
-                {partido.jugadores} / {partido.total} Jugadores
+              <span className="text-[10px] font-black italic uppercase tracking-widest text-white/70">
+                {partido.jugadores} / {partido.total}
               </span>
             </div>
           </div>
@@ -110,44 +108,38 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botón Cancelar/Eliminar: Visible para Admin o si eres el Dueño */}
           {(isAdmin || isHost) && (
             <button 
               onClick={(e) => {
                 e.stopPropagation();
                 const confirmMsg = isHost 
-                  ? "¿Estás seguro de cancelar tu pichanga? Se moverá al historial." 
-                  : "¿Eliminar esta partida definitivamente?";
+                  ? "¿Cancelar tu pichanga?" 
+                  : "¿Eliminar partida?";
                 if (window.confirm(confirmMsg)) {
-                  onDelete(e, partido.id);
+                  onDelete(e, partido._id || partido.id);
                 }
               }}
-              className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-lg group-hover:scale-105 active:scale-90"
-              title={isHost ? "Cancelar Mi Partida" : "Eliminar Partida (Admin)"}
+              className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all active:scale-90"
             >
-              <Trash2 size={20} />
+              <Trash2 size={18} />
             </button>
           )}
           
-          {/* BOTÓN DE ACCIÓN DINÁMICO */}
           <button 
             onClick={(e) => { e.stopPropagation(); onSelect(partido); }}
             className={`
-              h-14 px-6 rounded-2xl font-black italic uppercase text-xs transition-all flex items-center gap-2
+              h-11 px-5 rounded-xl font-black italic uppercase text-[10px] transition-all flex items-center gap-2
               ${isHost 
                 ? 'bg-cyan-500 text-black hover:bg-white shadow-[0_0_20px_rgba(6,182,212,0.3)]' 
                 : (partido.estado === 'PARTIDO LISTO' || isJoined)
                   ? 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/10'
-                  : 'bg-white text-black hover:bg-[#CCFF00] shadow-xl active:scale-95'}
+                  : 'bg-white text-black hover:bg-[#CCFF00] active:scale-95'}
             `}
           >
             {isHost ? (
-              <>
-                <Settings2 size={16} />
-                Gestionar
-              </>
+              <><Settings2 size={14} /> Gestión</>
             ) : isJoined ? (
-              'Dentro'
+              'Listo'
             ) : (
               'Unirse'
             )}
