@@ -39,9 +39,8 @@ Plaintext
 ├── frontend/          # React 18 (Hospedado en Vercel)
 └── docker-compose.yml # Orquestación local
 
-Contacto para Licencias: ssagredo13@gmail.com / correlavhozchile@gmail.com
+Contacto para Licencias: ssagredo13@gmail.com / correlavozchile@gmail.com
 
-Propiedad de Correlavoz Chile.
-
+*************************************************
 🤖 Co-Desarrollo con Inteligencia Artificial
 Este proyecto ha sido optimizado y co-desarrollado utilizando Google Gemini 3 Flash.
