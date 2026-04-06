@@ -42,12 +42,5 @@ Contacto para Licencias: ssagredo13@gmail.com / correlavhozchile@gmail.com
 
 Propiedad de Correlavoz Chile.
 
-
----
-
-### ¿Por qué este formato?
-1.  **El Bloque de Cita (`>`):** Visualmente separa el aviso legal del resto del contenido técnico, dándole importancia inmediata.
-2.  **Menciones Legales Específicas:** Citar la **Ley 17.336** y el **Convenio de Berna** envía un mensaje claro de que conoces tus derechos y estás dispuesto a ejercerlos.
-3.  **Copyright dinámico:** Al incluir el año y tu nombre/marca, estableces una línea base para cualquier disputa de autoría futura.
-
-Con esto en el encabezado, tu código queda bajo una declaración de privacidad explícita desde el segu
+🤖 Co-Desarrollo con Inteligencia Artificial
+Este proyecto ha sido optimizado y co-desarrollado utilizando Google Gemini 3 Flash.
