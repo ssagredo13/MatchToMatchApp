@@ -1,16 +1,17 @@
 import MatchCard from '../MatchCard';
 
 const MatchSilo = ({ title, subtitle, matches, user, isAdmin, onDelete, onSelect, activeMatchId, setActiveMatchId, setMapCenter, className = "" }) => {
-  //if (matches.length === 0) return null;
-  if (matches.length === 0 && subtitle !== 'LIVE / HOY') return null;
+  // Quitamos el return null para que el diseño no salte si un silo está vacío
+  
   return (
-    <section className={`mb-16 ${className}`}>
+    <section className={`${className}`}>
       <div className="mb-8">
         <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">{subtitle}</h2>
         <h3 className="text-4xl font-black italic uppercase tracking-tighter">{title}</h3>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Ajustamos el grid: por defecto 1 columna, y en pantallas grandes según el contenedor padre */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {matches.map(p => {
           const pId = p._id || p.id;
           return (

@@ -231,8 +231,8 @@ const Dashboard = ({ user, onLogout }) => {
         {/* --- CONTENEDOR DE SILOS --- */}
         <div className="space-y-20 mb-20">
           
-          {/* NIVEL 1: HOY (DESTACADO) */}
-          <div className="relative">
+          {/* NIVEL 1: HOY (DESTACADO - ANCHO COMPLETO) */}
+          <div className="relative w-full">
             <div className="absolute -inset-4 bg-[#CCFF00]/5 blur-3xl rounded-[60px] -z-10" />
             <MatchSilo 
               title="Match Center" 
@@ -252,10 +252,11 @@ const Dashboard = ({ user, onLogout }) => {
             )}
           </div>
 
-          {/* NIVEL 2 Y 3: GRILLA SECUNDARIA */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+          {/* NIVEL 2 Y 3: GRILLA SECUNDARIA (DOS COLUMNAS AMPLIAS) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             
-            <div className="bg-white/[0.02] p-8 rounded-[48px] border border-white/5 hover:border-[#CCFF00]/20 transition-colors">
+            {/* PRÓXIMAMENTE */}
+            <div className="bg-white/[0.02] p-8 rounded-[48px] border border-white/5 hover:border-[#CCFF00]/20 transition-all duration-500">
               <MatchSilo 
                 title="Próximamente" 
                 subtitle="CALENDARIO / PLANES"
@@ -270,7 +271,8 @@ const Dashboard = ({ user, onLogout }) => {
               )}
             </div>
 
-            <div className="bg-black/40 p-8 rounded-[48px] border border-white/5 opacity-60 hover:opacity-100 transition-opacity">
+            {/* HISTORIAL */}
+            <div className="bg-black/40 p-8 rounded-[48px] border border-white/5 opacity-60 hover:opacity-100 transition-all duration-500">
               <MatchSilo 
                 title="Historial" 
                 subtitle="RECIENTES / 7 DÍAS"
@@ -288,6 +290,7 @@ const Dashboard = ({ user, onLogout }) => {
           </div>
         </div>
 
+        {/* MAPA */}
         <MatchMapLive
           partidos={matchesFiltrados} 
           mapCenter={mapCenter} 
