@@ -263,7 +263,11 @@ const Dashboard = ({ user, onLogout }) => {
               user={user} isAdmin={isAdmin}
               activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
               setMapCenter={setMapCenter} onDelete={handleEliminarPartido}
-              onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
+              onSelect={(m) => { 
+                if (m.estadoEspecial === 'FALLIDA') return; // BLOQUEO TOTAL
+                setSelectedPartido(m); 
+                setModalType('UNIRSE'); 
+              }}
             />
           </div>
 

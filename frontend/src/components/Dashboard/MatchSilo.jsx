@@ -25,23 +25,22 @@ const MatchSilo = ({
         </h3>
       </div>
       
-      {/* QUITAMOS: xl:grid-cols-3 
-          DEJAMOS: grid-cols-1 
-          Esto permite que la MatchCard use todo el ancho de la columna del Dashboard.
-      */}
       <div className="grid grid-cols-1 gap-6">
         {matches.map(p => {
           const pId = p._id || p.id;
+          const esFallida = p.estadoEspecial === 'FALLIDA'; // <--- Detectamos si es fallida
+
           return (
             <div 
               key={pId} 
               onClick={() => { 
+                if (esFallida) return; // <--- BLOQUEO: No activamos ID ni movemos mapa si falló
                 setActiveMatchId(pId); 
                 if(p.lat) setMapCenter([p.lat, p.lng]); 
               }}
               className={`transition-all duration-300 ${
                 activeMatchId === pId ? 'scale-[1.02]' : ''
-              }`}
+              } ${esFallida ? 'cursor-default' : 'cursor-pointer'}`} // <--- Cursor coherente
             >
               <MatchCard 
                 partido={p} 
