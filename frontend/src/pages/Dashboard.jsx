@@ -129,8 +129,10 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  // AJUSTADO: Usa PATCH y la ruta /cancelar de tu partidos.py
+  // HANDLER EDITADO: Blindado para evitar errores de propagación y usar el endpoint correcto
   const handleEliminarPartido = async (pId) => {
+    if (!window.confirm("¿Estás seguro de que quieres cancelar esta partida?")) return;
+
     try {
       const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { 
         method: 'PATCH',
@@ -138,9 +140,8 @@ const Dashboard = ({ user, onLogout }) => {
       });
 
       if (res.ok) {
-        // Filtramos localmente para que desaparezca de la vista de inmediato
         setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
-        console.log("✅ Partido cancelado exitosamente (activo: false)");
+        console.log("✅ Partido cancelado exitosamente");
       } else {
         const error = await res.json();
         alert(`❌ No se pudo cancelar: ${error.detail || 'Error en servidor'}`);

@@ -29,20 +29,12 @@ const MatchSilo = ({
         {matches.map(p => {
           const pId = p._id || p.id;
           
-          // BLOQUEO TOTAL: Si el silo es "Historial" o la partida es fallida
-          const esBloqueada = title === "Historial" || p.estadoEspecial === 'FALLIDA';
-
           return (
             <div 
               key={pId} 
-              onClick={() => { 
-                if (esBloqueada) return; // <-- NO SE ABRE EL MODAL SI ES HISTORIAL
-                setActiveMatchId(pId); 
-                if(p.lat) setMapCenter([p.lat, p.lng]); 
-              }}
               className={`transition-all duration-300 ${
                 activeMatchId === pId ? 'scale-[1.02]' : ''
-              } ${esBloqueada ? 'cursor-default pointer-events-none' : 'cursor-pointer'}`}
+              }`}
             >
               <MatchCard 
                 partido={p} 
@@ -50,9 +42,14 @@ const MatchSilo = ({
                 isAdmin={isAdmin} 
                 isActive={activeMatchId === pId}
                 onDelete={onDelete} 
-                onSelect={onSelect}
-                // Pasamos una nueva prop para que la tarjeta sepa que debe morir
-                isLocked={esBloqueada} 
+                onSelect={(selected) => {
+                  setActiveMatchId(pId);
+                  if(selected.lat) setMapCenter([selected.lat, selected.lng]);
+                  // Si no es del historial, abrimos el modal
+                  if (title !== "Historial") {
+                    onSelect(selected);
+                  }
+                }}
               />
             </div>
           );

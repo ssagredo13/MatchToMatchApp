@@ -1,12 +1,9 @@
 import React from 'react';
 import { Users, Settings2, Crown, Lock, Trash2, UserPlus } from 'lucide-react';
 
-const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, user }) => {
-  // Verificamos si el usuario actual es el dueño de la pichanga
-  // Usamos creadorEmail que es el campo que vimos en tu Atlas
+const MatchCard = ({ partido, isActive, isAdmin, onSelect, onDelete, user }) => {
   const isHost = user?.email && partido.creadorEmail === user.email;
   
-  // Lógica de expiración
   const ahora = new Date();
   const fechaPartido = new Date(`${partido.fecha}T${partido.hora}`);
   const yaPaso = ahora > fechaPartido;
@@ -28,22 +25,6 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
             : 'bg-[#0f172a]/40 border-white/5 hover:border-white/20 hover:bg-[#0f172a]/60 cursor-pointer'}
       `}
     >
-      {/* ESCUDO DE SEGURIDAD */}
-      {esFallida && (
-        <div 
-          className="absolute inset-0 z-[100] cursor-not-allowed bg-transparent" 
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-          }} 
-        />
-      )}
-
-      {/* INDICADOR LATERAL */}
-      {isActive && !esFallida && (
-        <div className="absolute left-0 top-1/4 bottom-1/4 w-1.5 bg-[#CCFF00] rounded-r-full shadow-[4px_0_15_#CCFF00]" />
-      )}
-
       {/* HEADER */}
       <div className="flex justify-between items-start mb-6">
         <div className="space-y-1">
@@ -106,23 +87,20 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
         </div>
 
         <div className="flex items-center gap-2">
-          {/* BOTÓN ELIMINAR: Solo para el Organizador */}
+          {/* BOTÓN ELIMINAR: Deshabilitado si es fallida/pasada */}
           {isHost && !esFallida && (
             <button
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                if(window.confirm("¿Estás seguro de cancelar esta pichanga?")) {
-                  onDelete(partido.id || partido._id);
-                }
+                onDelete(partido._id || partido.id);
               }}
               className="h-11 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 transition-colors"
-              title="Eliminar Partida"
             >
               <Trash2 size={18} />
             </button>
           )}
 
-          {/* BOTÓN PRINCIPAL ACCIÓN */}
           <div className={`h-11 px-6 rounded-xl font-black italic uppercase text-[10px] flex items-center gap-2 border transition-all
             ${esFallida 
               ? 'bg-transparent text-slate-700 border-white/5' 
