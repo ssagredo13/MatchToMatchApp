@@ -1,9 +1,14 @@
 import React from 'react';
-import { MapPin, Users, Trash2, Settings2, Crown, Lock } from 'lucide-react';
+import { Users, Settings2, Crown, Lock } from 'lucide-react';
 
-const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, user }) => {
+const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, user }) => {
   const isHost = partido.creadorEmail === user?.email;
-  const esFallida = partido.estadoEspecial === 'FALLIDA';
+  
+  // Lógica de expiración en tiempo real (evita que gestiones partidos que ya pasaron)
+  const ahora = new Date();
+  const fechaPartido = new Date(`${partido.fecha}T${partido.hora}`);
+  const yaPaso = ahora > fechaPartido;
+  const esFallida = partido.estadoEspecial === 'FALLIDA' || yaPaso;
 
   const fechaObj = new Date(partido.fecha + 'T00:00:00');
   const dia = fechaObj.toLocaleDateString('es-CL', { day: '2-digit' });
@@ -21,12 +26,20 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
             : 'bg-[#0f172a]/40 border-white/5 hover:border-white/20 hover:bg-[#0f172a]/60 cursor-pointer'}
       `}
     >
-      {/* CAPA DE BLOQUEO: Si es fallida, esto impide CUALQUIER click interno */}
-      {esFallida && <div className="absolute inset-0 z-50 cursor-not-allowed" />}
+      {/* ESCUDO DE SEGURIDAD: Bloquea clics físicos y burbujeo de eventos si la partida expiró */}
+      {esFallida && (
+        <div 
+          className="absolute inset-0 z-[100] cursor-not-allowed bg-transparent" 
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }} 
+        />
+      )}
 
       {/* INDICADOR LATERAL */}
       {isActive && !esFallida && (
-        <div className="absolute left-0 top-1/4 bottom-1/4 w-1.5 bg-[#CCFF00] rounded-r-full shadow-[4px_0_15px_#CCFF00]" />
+        <div className="absolute left-0 top-1/4 bottom-1/4 w-1.5 bg-[#CCFF00] rounded-r-full shadow-[4px_0_15_#CCFF00]" />
       )}
 
       {/* HEADER */}
@@ -90,7 +103,6 @@ const MatchCard = ({ partido, isActive, isAdmin, isJoined, onSelect, onDelete, u
           </div>
         </div>
 
-        {/* BOTÓN ÚNICO DE ESTADO */}
         <div className={`h-11 px-6 rounded-xl font-black italic uppercase text-[10px] flex items-center gap-2 border 
           ${esFallida 
             ? 'bg-transparent text-slate-700 border-white/5' 
