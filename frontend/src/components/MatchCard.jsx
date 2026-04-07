@@ -19,7 +19,7 @@ const MatchCard = ({ partido, isActive, isAdmin, onSelect, onDelete, user }) => 
       className={`
         relative p-6 rounded-[32px] border transition-all duration-500 overflow-hidden group
         ${esFallida 
-          ? 'bg-slate-950/40 border-white/5 cursor-default opacity-50 grayscale' 
+          ? 'bg-slate-950/40 border-white/5 cursor-default opacity-80' 
           : isActive 
             ? 'bg-[#0f172a] border-[#CCFF00] shadow-[0_0_40px_rgba(204,255,0,0.15)] scale-[1.02] cursor-pointer' 
             : 'bg-[#0f172a]/40 border-white/5 hover:border-white/20 hover:bg-[#0f172a]/60 cursor-pointer'}
