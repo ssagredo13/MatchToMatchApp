@@ -1,9 +1,10 @@
 # main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import equipos, partidos, recintos, auth 
+# Importamos usuarios en lugar de auth para centralizar la lógica
+from app.routes import usuarios, equipos, partidos, recintos 
 
-# Agregamos redirect_slashes=False para evitar el error 307 que vimos en tus logs
+# redirect_slashes=False evita que el navegador haga redirecciones raras (error 307)
 app = FastAPI(
     title="Match to Match API",
     description="Backend Profesional para gestión de pichangas",
@@ -12,11 +13,11 @@ app = FastAPI(
 )
 
 # --- CONFIGURACIÓN DE CORS ---
-# Especificar el dominio de Vercel ayuda a que el navegador confíe más en la conexión
+# Esto permite que tu Frontend en Vercel se comunique sin bloqueos
 origins = [
     "https://match-to-match-app.vercel.app",
-    "http://localhost:5173",
-    "*" # Mantenemos el asterisco por si acaso, pero los anteriores tienen prioridad
+    "http://localhost:5173", # Para tus pruebas locales
+    "*" 
 ]
 
 app.add_middleware(
@@ -28,12 +29,20 @@ app.add_middleware(
 )
 
 # --- REGISTRO DE RUTAS ---
-# IMPORTANTE: Asegúrate de que los prefijos en los routers tengan o no barra consistentemente
-app.include_router(auth.router)
+# Hemos quitado auth.router porque usuarios.router ya cubre esas funciones
+app.include_router(usuarios.router)  
 app.include_router(equipos.router)
 app.include_router(partidos.router)
 app.include_router(recintos.router)
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Backend Match to Match", "version": "2.1.0"}
+    return {
+        "status": "ok", 
+        "message": "Backend Match to Match funcionando", 
+        "version": "2.1.0"
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "online"}

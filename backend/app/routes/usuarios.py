@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
 
+# Añadimos ambos decoradores para que funcione tanto con /usuarios/login como con /auth/login
 @router.post("/login")
+@router.post("/auth/login")
 async def login_o_registrar(user_data: dict = Body(...)):
     email = user_data.get("email")
     ahora = datetime.utcnow()
@@ -23,10 +25,10 @@ async def login_o_registrar(user_data: dict = Body(...)):
     # 2. Si no existe, lo creamos con los datos de Google
     nuevo_usuario = {
         "email": email,
-        "nombreReal": user_data.get("displayName"), # Mantenemos nombreReal para coherencia con el Sidebar
+        "nombreReal": user_data.get("displayName"), 
         "photoURL": user_data.get("photoURL"),
         "rol": "jugador",
-        "ciudad": "Talca", # Ciudad por defecto para el Hub inicial
+        "ciudad": "Talca", 
         "fecha_registro": ahora,
         "ultimaConexion": ahora
     }
@@ -40,7 +42,7 @@ async def login_o_registrar(user_data: dict = Body(...)):
 async def listar_usuarios_activos(email: str = None):
     """
     Retorna usuarios divididos en Online (activos hace < 15 min) 
-    y Recientes (activos hace más tiempo).
+    y Recientes (activos hace más tiempo) en un objeto estructurado.
     """
     limite_online = datetime.utcnow() - timedelta(minutes=15)
     
@@ -60,8 +62,11 @@ async def listar_usuarios_activos(email: str = None):
         user_doc["estadoConexion"] = "offline"
         recientes.append(user_doc)
         
-    # Retornamos ambos grupos (el frontend ActivePlayers los unirá o filtrará)
-    return online + recientes
+    # IMPORTANTE: Retornamos como OBJETO para que el frontend pueda leer .length
+    return {
+        "online": online,
+        "recientes": recientes
+    }
 
 @router.get("/")
 async def listar_usuarios():
