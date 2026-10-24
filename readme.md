@@ -30,6 +30,8 @@ El ecosistema **Match to Match** utiliza una arquitectura de nube híbrida de al
 ## 📍 Radar de partidos
 El dashboard prioriza un radar responsive con los partidos futuros y de hoy, búsqueda por equipo/recinto y filtros por estado. La ubicación del dispositivo es opcional: solo se solicita cuando el usuario pulsa **Cerca de mí**, se mantiene en memoria en el navegador y se usa para ordenar/calcular distancias aproximadas; si se deniega, el mapa conserva Talca como centro. Los partidos se muestran con sus coordenadas guardadas y los cambios de ubicación no se envían a la API.
 
+El mapa usa las capas públicas oscuras de Esri (base y referencias), sin API key; la disponibilidad y el uso están sujetos a los términos vigentes de Esri. Se conserva la atribución requerida por la fuente. Es una alternativa para el MVP, no una garantía de disponibilidad ni de uso gratuito ilimitado; revisa los [términos de Esri](https://www.esri.com/en-us/legal/terms) antes de escalar el tráfico. Si el uso aumenta, migra a un proveedor con plan y límites adecuados. No precargues mosaicos ni automatices descargas.
+
 ## 🤖 Co-Desarrollo con Inteligencia Artificial
 Este proyecto ha sido optimizado y co-desarrollado utilizando **Gemini 3 Flash**. La IA actuó como un colaborador estratégico en:
 * Refactorización crítica de componentes React.
