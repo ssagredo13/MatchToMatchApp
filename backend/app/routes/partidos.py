@@ -1,8 +1,9 @@
+import hashlib
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, status
-from pymongo.errors import PyMongoError
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from app.config import settings
 from app.database import equipos_col, format_mongo_doc, partidos_col
@@ -10,6 +11,23 @@ from app.models import MatchUpdate, PartidoCreate
 from app.security import get_current_user
 
 router = APIRouter(prefix="/api/partidos", tags=["Partidos"])
+IDEMPOTENCY_FIELDS = {"idempotencyKey", "idempotencyPayloadHash"}
+
+
+def _format_public_match(partido: dict) -> dict:
+    public_partido = {
+        key: value for key, value in partido.items() if key not in IDEMPOTENCY_FIELDS
+    }
+    return format_mongo_doc(public_partido)
+
+
+def _get_existing_idempotent_match(partido: dict, payload_hash: str) -> dict:
+    if partido.get("idempotencyPayloadHash") != payload_hash:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This idempotency key was already used for a different match",
+        )
+    return _format_public_match(partido)
 
 
 @router.get("/")
@@ -29,14 +47,36 @@ async def listar_partidos(
 
     partidos = []
     async for partido in partidos_col.find(filtro).sort("_id", -1):
-        partidos.append(format_mongo_doc(partido))
+        partidos.append(_format_public_match(partido))
     return partidos
 
 
 @router.post("/")
-async def crear_partido(partido: PartidoCreate, current_user: dict = Depends(get_current_user)):
+async def crear_partido(
+    partido: PartidoCreate,
+    current_user: dict = Depends(get_current_user),
+    idempotency_key: Optional[str] = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=100,
+    ),
+):
     if not ObjectId.is_valid(partido.equipoId):
         raise HTTPException(status_code=400, detail="ID de equipo inválido")
+
+    payload_hash = hashlib.sha256(partido.model_dump_json().encode()).hexdigest()
+    if idempotency_key is not None:
+        idempotency_key = idempotency_key.strip()
+        if not idempotency_key:
+            raise HTTPException(status_code=400, detail="Idempotency-Key cannot be empty")
+
+        existing = await partidos_col.find_one({
+            "creadorEmail": current_user["email"],
+            "idempotencyKey": idempotency_key,
+        })
+        if existing:
+            return _get_existing_idempotent_match(existing, payload_hash)
 
     equipo = await equipos_col.find_one({
         "_id": ObjectId(partido.equipoId),
@@ -55,15 +95,35 @@ async def crear_partido(partido: PartidoCreate, current_user: dict = Depends(get
         "activo": True,
         "rival": None,
     })
+    if idempotency_key is not None:
+        partido_data["idempotencyKey"] = idempotency_key
+        partido_data["idempotencyPayloadHash"] = payload_hash
     try:
         result = await partidos_col.insert_one(partido_data)
+    except DuplicateKeyError as exc:
+        if idempotency_key is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not save the match",
+            ) from exc
+
+        existing = await partidos_col.find_one({
+            "creadorEmail": current_user["email"],
+            "idempotencyKey": idempotency_key,
+        })
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not confirm whether the match was saved",
+            ) from exc
+        return _get_existing_idempotent_match(existing, payload_hash)
     except PyMongoError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not save the match",
         ) from exc
 
-    return {"id": str(result.inserted_id), **partido_data}
+    return _format_public_match({"_id": result.inserted_id, **partido_data})
 
 
 @router.patch("/{partido_id}/cancelar")

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
 from app.config import settings
-from app.database import client, equipos_col, ping_db, usuarios_col
+from app.database import client, equipos_col, partidos_col, ping_db, usuarios_col
 from app.routes import auth, equipos, partidos, recintos
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,11 @@ async def lifespan(app: FastAPI):
         await equipos_col.create_index(
             [("creadorEmail", 1), ("nombre", 1)],
             unique=True,
+        )
+        await partidos_col.create_index(
+            [("creadorEmail", 1), ("idempotencyKey", 1)],
+            unique=True,
+            partialFilterExpression={"idempotencyKey": {"$type": "string"}},
         )
     except PyMongoError:
         logger.exception(
@@ -45,7 +50,7 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "Idempotency-Key"],
 )
 
 app.include_router(auth.router)

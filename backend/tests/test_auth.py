@@ -1,3 +1,5 @@
+import hashlib
+
 import jwt
 from bson import ObjectId
 from fastapi import FastAPI, HTTPException, Response
@@ -7,6 +9,7 @@ from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, patch
 
 from app.routes import auth
+from app.routes import partidos as partidos_route
 from app.config import Settings
 from app.security import create_access_token, get_current_user
 from fastapi.security import HTTPAuthorizationCredentials
@@ -131,7 +134,7 @@ class CorsConfigurationTests(IsolatedAsyncioTestCase):
             CORSMiddleware,
             allow_origins=origins,
             allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-            allow_headers=["Content-Type", "Authorization"],
+            allow_headers=["Content-Type", "Authorization", "Idempotency-Key"],
         )
 
         @test_app.post("/api/auth/login")
@@ -159,7 +162,10 @@ class CorsConfigurationTests(IsolatedAsyncioTestCase):
             "headers": [
                 (b"origin", b"https://match-to-match-app.vercel.app"),
                 (b"access-control-request-method", b"POST"),
-                (b"access-control-request-headers", b"content-type"),
+                (
+                    b"access-control-request-headers",
+                    b"content-type,idempotency-key",
+                ),
             ],
             "client": ("127.0.0.1", 1234),
             "server": ("testserver", 443),
@@ -172,3 +178,83 @@ class CorsConfigurationTests(IsolatedAsyncioTestCase):
             response_headers[b"access-control-allow-origin"].decode(),
             "https://match-to-match-app.vercel.app",
         )
+        self.assertIn(
+            b"idempotency-key",
+            response_headers[b"access-control-allow-headers"].lower(),
+        )
+
+
+class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
+    async def test_retry_with_same_key_returns_saved_match_without_inserting_again(self):
+        match = partidos_route.PartidoCreate(
+            equipoId=str(ObjectId()),
+            recinto="Cancha de prueba",
+            lat=-35.4,
+            lng=-71.6,
+            hora="20:00",
+            fecha="2026-10-30",
+            tipo="JUGADORES",
+            jugadores=1,
+            total=12,
+            arqueroFaltante=False,
+        )
+        payload_hash = hashlib.sha256(match.model_dump_json().encode()).hexdigest()
+        saved_match = {
+            "_id": ObjectId(),
+            "equipo": "Equipo de prueba",
+            "creadorEmail": "player@example.com",
+            "idempotencyKey": "request-key",
+            "idempotencyPayloadHash": payload_hash,
+        }
+        matches = SimpleNamespace(
+            find_one=AsyncMock(return_value=saved_match),
+            insert_one=AsyncMock(),
+        )
+        teams = SimpleNamespace(find_one=AsyncMock())
+
+        with (
+            patch("app.routes.partidos.partidos_col", matches),
+            patch("app.routes.partidos.equipos_col", teams),
+        ):
+            result = await partidos_route.crear_partido(
+                match,
+                {"email": "player@example.com"},
+                "request-key",
+            )
+
+        self.assertEqual(result["id"], str(saved_match["_id"]))
+        self.assertNotIn("idempotencyKey", result)
+        self.assertNotIn("idempotencyPayloadHash", result)
+        matches.insert_one.assert_not_awaited()
+        teams.find_one.assert_not_awaited()
+
+    async def test_reusing_key_for_different_match_returns_conflict(self):
+        match = partidos_route.PartidoCreate(
+            equipoId=str(ObjectId()),
+            recinto="Cancha de prueba",
+            lat=-35.4,
+            lng=-71.6,
+            hora="20:00",
+            fecha="2026-10-30",
+            tipo="JUGADORES",
+            jugadores=1,
+            total=12,
+            arqueroFaltante=False,
+        )
+        saved_match = {
+            "_id": ObjectId(),
+            "creadorEmail": "player@example.com",
+            "idempotencyKey": "request-key",
+            "idempotencyPayloadHash": "different-payload",
+        }
+        matches = SimpleNamespace(find_one=AsyncMock(return_value=saved_match))
+
+        with patch("app.routes.partidos.partidos_col", matches):
+            with self.assertRaises(HTTPException) as raised:
+                await partidos_route.crear_partido(
+                    match,
+                    {"email": "player@example.com"},
+                    "request-key",
+                )
+
+        self.assertEqual(raised.exception.status_code, 409)

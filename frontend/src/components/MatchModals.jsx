@@ -7,7 +7,7 @@ const MatchModals = ({
   modalType, setModalType, selectedPartido, handleUnirseMatch,
   misEquipos, step, setStep, formPartida, setFormPartida, 
   handleCrearPartida, nuevoEquipo, setNuevoEquipo, errorMessage,
-  handleCrearEquipoDB 
+  handleCrearEquipoDB, isCreatingMatch = false,
 }) => {
   
   const [isCreating, setIsCreating] = useState(false);
@@ -224,13 +224,17 @@ const MatchModals = ({
 
                 <button 
                   onClick={handleCrearPartida} 
-                  disabled={!formPartida.equipoId || !formPartida.recinto || !formPartida.fecha || !formPartida.hora}
+                  disabled={!formPartida.equipoId || !formPartida.recinto || !formPartida.fecha || !formPartida.hora || isCreatingMatch}
                   className={`w-full h-20 text-lg font-black italic uppercase rounded-[28px] transition-all shadow-xl active:scale-95 mt-4 ${
                     formPartida.equipoId && formPartida.recinto && formPartida.fecha && formPartida.hora
                     ? 'bg-[#ccff00] text-black shadow-[#ccff00]/20 hover:bg-white' 
                     : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
                   }`}
-                > Lanzar Pichanga </button>
+                >
+                  {isCreatingMatch
+                    ? <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={18} /> Publicando...</span>
+                    : 'Lanzar Pichanga'}
+                </button>
               </div>
             ) : (
               <div className="space-y-6">

@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import L from 'leaflet';
 import { apiFetch } from '../lib/api';
@@ -24,7 +24,9 @@ const Dashboard = ({ user, onLogout }) => {
   const [recintosOficiales, setRecintosOficiales] = useState([]);
   const [misEquipos, setMisEquipos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const matchCreationRef = useRef({ inFlight: false, fingerprint: '', key: '' });
   
   const [filtro, setFiltro] = useState('TODOS');
   const [modalType, setModalType] = useState(null); 
@@ -80,6 +82,8 @@ const Dashboard = ({ user, onLogout }) => {
 
   // --- HANDLERS ---
   const handleCrearPartida = async () => {
+    if (matchCreationRef.current.inFlight) return;
+
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
 
@@ -106,16 +110,32 @@ const Dashboard = ({ user, onLogout }) => {
       arqueroFaltante: !!formPartida.requiereArquero,
     };
 
+    const fingerprint = JSON.stringify(nuevaPartida);
+    if (matchCreationRef.current.fingerprint !== fingerprint) {
+      matchCreationRef.current = {
+        inFlight: false,
+        fingerprint,
+        key: crypto.randomUUID(),
+      };
+    }
+    matchCreationRef.current.inFlight = true;
+    setIsCreatingMatch(true);
+
     try {
       const guardada = await apiFetch('/api/partidos', {
         method: 'POST',
+        headers: { 'Idempotency-Key': matchCreationRef.current.key },
         body: JSON.stringify(nuevaPartida)
       });
       setPartidos(prev => [guardada, ...prev]);
       setModalType(null);
       setLoadError('');
+      matchCreationRef.current = { inFlight: false, fingerprint: '', key: '' };
     } catch (error) {
       setLoadError(error.message || 'No se pudo publicar la partida.');
+    } finally {
+      matchCreationRef.current.inFlight = false;
+      setIsCreatingMatch(false);
     }
   };
 
@@ -191,6 +211,7 @@ const Dashboard = ({ user, onLogout }) => {
     errorMessage: loadError,
     misEquipos, step, setStep, formPartida, setFormPartida,
     handleCrearPartida, nuevoEquipo, setNuevoEquipo,
+    isCreatingMatch,
     recintosOficiales, handleCrearEquipoDB: async (n) => {
         try {
           const creado = await apiFetch('/api/equipos', {
