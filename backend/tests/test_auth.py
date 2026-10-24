@@ -185,8 +185,8 @@ class CorsConfigurationTests(IsolatedAsyncioTestCase):
 
 
 class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
-    async def test_retry_with_same_key_returns_saved_match_without_inserting_again(self):
-        match = partidos_route.PartidoCreate(
+    def _make_match(self):
+        return partidos_route.PartidoCreate(
             equipoId=str(ObjectId()),
             recinto="Cancha de prueba",
             lat=-35.4,
@@ -194,10 +194,13 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
             hora="20:00",
             fecha="2026-10-30",
             tipo="JUGADORES",
-            jugadores=1,
+            jugadores=2,
             total=12,
             arqueroFaltante=False,
         )
+
+    async def test_retry_with_same_key_returns_saved_match_without_inserting_again(self):
+        match = self._make_match()
         payload_hash = hashlib.sha256(match.model_dump_json().encode()).hexdigest()
         saved_match = {
             "_id": ObjectId(),
@@ -229,18 +232,7 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
         teams.find_one.assert_not_awaited()
 
     async def test_reusing_key_for_different_match_returns_conflict(self):
-        match = partidos_route.PartidoCreate(
-            equipoId=str(ObjectId()),
-            recinto="Cancha de prueba",
-            lat=-35.4,
-            lng=-71.6,
-            hora="20:00",
-            fecha="2026-10-30",
-            tipo="JUGADORES",
-            jugadores=1,
-            total=12,
-            arqueroFaltante=False,
-        )
+        match = self._make_match()
         saved_match = {
             "_id": ObjectId(),
             "creadorEmail": "player@example.com",
@@ -258,3 +250,183 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
                 )
 
         self.assertEqual(raised.exception.status_code, 409)
+
+    async def test_creating_match_persists_owner_and_returns_database_id(self):
+        match = self._make_match()
+        owner = {"email": "player@example.com", "nombre": "Player"}
+        team = {"_id": ObjectId(), "nombre": "Los de prueba"}
+        inserted_id = ObjectId()
+        teams = SimpleNamespace(find_one=AsyncMock(return_value=team))
+        matches = SimpleNamespace(
+            find_one=AsyncMock(return_value=None),
+            insert_one=AsyncMock(return_value=SimpleNamespace(inserted_id=inserted_id)),
+        )
+
+        with (
+            patch("app.routes.partidos.equipos_col", teams),
+            patch("app.routes.partidos.partidos_col", matches),
+        ):
+            result = await partidos_route.crear_partido(match, owner, "new-request")
+
+        saved_data = matches.insert_one.await_args.args[0]
+        self.assertEqual(result["id"], str(inserted_id))
+        self.assertEqual(result["creadorEmail"], owner["email"])
+        self.assertEqual(result["estado"], "BUSCANDO JUGADORES")
+        self.assertEqual(saved_data["idempotencyKey"], "new-request")
+        self.assertNotIn("idempotencyKey", result)
+        self.assertEqual(saved_data["jugadoresInscritos"], [owner["email"]])
+
+    async def test_creating_match_with_another_users_team_is_forbidden(self):
+        match = self._make_match()
+        teams = SimpleNamespace(find_one=AsyncMock(return_value=None))
+        matches = SimpleNamespace(find_one=AsyncMock(return_value=None), insert_one=AsyncMock())
+
+        with (
+            patch("app.routes.partidos.equipos_col", teams),
+            patch("app.routes.partidos.partidos_col", matches),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                await partidos_route.crear_partido(
+                    match,
+                    {"email": "player@example.com"},
+                    "new-request",
+                )
+
+        self.assertEqual(raised.exception.status_code, 403)
+        matches.insert_one.assert_not_awaited()
+
+    async def test_joining_full_or_already_joined_match_is_rejected_atomically(self):
+        match_id = ObjectId()
+        matches = SimpleNamespace(
+            find_one=AsyncMock(return_value={
+                "_id": match_id,
+                "creadorEmail": "host@example.com",
+                "tipo": "JUGADORES",
+                "activo": True,
+                "estado": "BUSCANDO JUGADORES",
+                "jugadores": 2,
+                "total": 3,
+            }),
+            update_one=AsyncMock(return_value=SimpleNamespace(modified_count=0)),
+        )
+
+        with patch("app.routes.partidos.partidos_col", matches):
+            with self.assertRaises(HTTPException) as raised:
+                await partidos_route.actualizar_partido(
+                    str(match_id),
+                    partidos_route.MatchUpdate(action="join"),
+                    {"email": "player@example.com"},
+                )
+
+        self.assertEqual(raised.exception.status_code, 409)
+        update_filter = matches.update_one.await_args.args[0]
+        self.assertEqual(update_filter["jugadoresInscritos"], {"$ne": "player@example.com"})
+        self.assertEqual(update_filter["jugadores"], {"$lt": 3})
+
+    async def test_successful_join_updates_player_count_and_closes_full_match(self):
+        match_id = ObjectId()
+        initial_match = {
+            "_id": match_id,
+            "creadorEmail": "host@example.com",
+            "tipo": "JUGADORES",
+            "activo": True,
+            "estado": "BUSCANDO JUGADORES",
+            "jugadores": 2,
+            "total": 3,
+        }
+        full_match = {**initial_match, "jugadores": 3}
+        saved_match = {
+            **full_match,
+            "estado": "PARTIDO LISTO",
+            "jugadoresInscritos": ["host@example.com", "player@example.com"],
+        }
+        matches = SimpleNamespace(
+            find_one=AsyncMock(side_effect=[initial_match, full_match, saved_match]),
+            update_one=AsyncMock(
+                side_effect=[
+                    SimpleNamespace(modified_count=1),
+                    SimpleNamespace(modified_count=1),
+                ]
+            ),
+        )
+
+        with patch("app.routes.partidos.partidos_col", matches):
+            result = await partidos_route.actualizar_partido(
+                str(match_id),
+                partidos_route.MatchUpdate(action="join"),
+                {"email": "player@example.com"},
+            )
+
+        self.assertEqual(result["estado"], "PARTIDO LISTO")
+        self.assertEqual(result["jugadores"], 3)
+        self.assertIn("player@example.com", result["jugadoresInscritos"])
+
+    async def test_challenge_with_another_users_team_is_forbidden(self):
+        match_id = ObjectId()
+        rival_team_id = ObjectId()
+        matches = SimpleNamespace(find_one=AsyncMock(return_value={
+            "_id": match_id,
+            "creadorEmail": "host@example.com",
+            "tipo": "RIVAL",
+            "activo": True,
+            "estado": "BUSCANDO RIVAL",
+        }))
+        teams = SimpleNamespace(find_one=AsyncMock(return_value=None))
+
+        with (
+            patch("app.routes.partidos.partidos_col", matches),
+            patch("app.routes.partidos.equipos_col", teams),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                await partidos_route.actualizar_partido(
+                    str(match_id),
+                    partidos_route.MatchUpdate(
+                        action="challenge",
+                        rival_team_id=str(rival_team_id),
+                    ),
+                    {"email": "player@example.com"},
+                )
+
+        self.assertEqual(raised.exception.status_code, 403)
+
+    async def test_only_match_owner_can_cancel_match(self):
+        match_id = ObjectId()
+        matches = SimpleNamespace(
+            find_one=AsyncMock(return_value={
+                "_id": match_id,
+                "creadorEmail": "host@example.com",
+            }),
+            update_one=AsyncMock(),
+        )
+
+        with patch("app.routes.partidos.partidos_col", matches):
+            with self.assertRaises(HTTPException) as raised:
+                await partidos_route.cancelar_partido(
+                    str(match_id),
+                    {"email": "player@example.com", "rol": "jugador"},
+                )
+
+        self.assertEqual(raised.exception.status_code, 403)
+        matches.update_one.assert_not_awaited()
+
+    async def test_match_owner_can_cancel_match(self):
+        match_id = ObjectId()
+        matches = SimpleNamespace(
+            find_one=AsyncMock(return_value={
+                "_id": match_id,
+                "creadorEmail": "host@example.com",
+            }),
+            update_one=AsyncMock(),
+        )
+
+        with patch("app.routes.partidos.partidos_col", matches):
+            result = await partidos_route.cancelar_partido(
+                str(match_id),
+                {"email": "host@example.com", "rol": "jugador"},
+            )
+
+        self.assertEqual(result["msg"], "Partido cancelado")
+        matches.update_one.assert_awaited_once_with(
+            {"_id": match_id},
+            {"$set": {"activo": False, "estado": "CANCELADO"}},
+        )

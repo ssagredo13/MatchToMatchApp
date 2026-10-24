@@ -1,22 +1,12 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
-import L from 'leaflet';
 import { apiFetch } from '../lib/api';
 
 // COMPONENTES MODULARIZADOS
 import Navbar from '../components/Navbar';
 import MatchModals from '../components/MatchModals';
 import MatchSilo from '../components/Dashboard/MatchSilo';
-import MatchMapLive from '../components/Dashboard/MatchMapLive';
-import MatchFilters from '../components/Dashboard/MatchFilters';
-
-// --- CONFIGURACIÓN DE ICONOS LEAFLET ---
-const neonIcon = new L.DivIcon({
-  className: 'custom-div-icon',
-  html: `<div style="background-color: #ccff00; width: 15px; height: 15px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 15px #ccff00;"></div>`,
-  iconSize: [15, 15],
-  iconAnchor: [7, 7]
-});
+import MatchRadar from '../components/Dashboard/MatchRadar';
 
 const Dashboard = ({ user, onLogout }) => {
   // --- ESTADOS ---
@@ -205,6 +195,7 @@ const Dashboard = ({ user, onLogout }) => {
   partidasHoy.sort((a, b) => a.hora.localeCompare(b.hora));
   partidasFuturas.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
   partidasPasadas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const partidasRadar = [...partidasHoy, ...partidasFuturas];
 
   const modalProps = {
     modalType, setModalType, selectedPartido, handleUnirseMatch,
@@ -239,25 +230,26 @@ const Dashboard = ({ user, onLogout }) => {
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
       <Navbar user={user} onLogout={onLogout} />
 
-      <main className="pt-36 px-4 md:px-8 max-w-[1500px] mx-auto pb-20">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-8">
-          <div className="space-y-2">
-            <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Talca Hub</h2>
-            <h1 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-[0.85]">
-              Dashboard <span className="opacity-10">M2M</span>
+      <main className="mx-auto max-w-[1600px] px-3 pb-12 pt-28 sm:px-5 md:px-8 md:pt-32">
+        <header className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="mb-2 text-[10px] font-black italic uppercase tracking-[0.4em] text-[#CCFF00]">
+              Match to Match · Talca
+            </p>
+            <h1 className="text-4xl font-black italic uppercase leading-none tracking-tight sm:text-5xl">
+              Partidos <span className="text-white/30">cerca</span>
             </h1>
           </div>
           <button 
             onClick={() => {setModalType('PARTIDA'); setStep(1);}} 
-            className="bg-[#CCFF00] text-black h-16 px-10 rounded-none skew-x-[-12deg] hover:bg-white transition-all shadow-[0_0_30px_rgba(204,255,0,0.15)] active:scale-95"
+            className="min-h-12 self-start rounded-xl bg-[#CCFF00] px-5 text-black transition-all hover:bg-white active:scale-95 sm:self-auto"
           >
-            <div className="skew-x-[12deg] flex items-center gap-3 font-black italic uppercase text-base">
-              <Plus size={24} strokeWidth={3}/> Crear Partida
+            <div className="flex items-center gap-2 font-black italic uppercase text-xs">
+              <Plus size={18} strokeWidth={3}/> Publicar partido
             </div>
           </button>
         </header>
 
-        <MatchFilters filtro={filtro} setFiltro={setFiltro} />
         {loadError && (
           <div role="alert" className="mb-6 rounded-xl border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-200">
             {loadError}
@@ -271,69 +263,46 @@ const Dashboard = ({ user, onLogout }) => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-20">
-          
-          <div className="bg-black/20 p-6 rounded-[40px] border border-white/5 opacity-40 hover:opacity-100 transition-all duration-500 order-2 lg:order-1">
-            <MatchSilo 
-              title="Historial" 
+        <MatchRadar
+          partidos={partidasRadar}
+          filtro={filtro}
+          setFiltro={setFiltro}
+          mapCenter={mapCenter}
+          setMapCenter={setMapCenter}
+          activeMatchId={activeMatchId}
+          setActiveMatchId={setActiveMatchId}
+          userEmail={user?.email}
+          isAdmin={isAdmin}
+          onCancelMatch={handleEliminarPartido}
+          onSelectMatch={(match) => {
+            setSelectedPartido(match);
+            setModalType('UNIRSE');
+          }}
+        />
+
+        <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+          <summary className="cursor-pointer text-sm font-black italic uppercase tracking-wide text-slate-300 marker:text-[#CCFF00]">
+            Historial reciente · {partidasPasadas.length}
+          </summary>
+          <div className="mt-6">
+            <MatchSilo
+              title="Tus partidos anteriores"
               subtitle="PASADO / RECIENTE"
-              matches={partidasPasadas.slice(0, 8)} 
-              user={user} isAdmin={isAdmin}
-              activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-              setMapCenter={setMapCenter} 
+              matches={partidasPasadas.slice(0, 8)}
+              user={user}
+              isAdmin={isAdmin}
+              activeMatchId={activeMatchId}
+              setActiveMatchId={setActiveMatchId}
+              setMapCenter={setMapCenter}
               onDelete={handleEliminarPartido}
-              onSelect={(m) => { 
-                if (m.estadoEspecial === 'FALLIDA') return;
-                setSelectedPartido(m); 
-                setModalType('UNIRSE'); 
+              onSelect={(match) => {
+                if (match.estadoEspecial === 'FALLIDA') return;
+                setSelectedPartido(match);
+                setModalType('UNIRSE');
               }}
             />
           </div>
-
-          <div className="relative order-1 lg:order-2 lg:scale-105 z-10">
-            <div className="absolute -inset-1 bg-[#CCFF00]/10 blur-2xl rounded-[50px] -z-10" />
-            <div className="bg-white/[0.03] p-8 rounded-[48px] border-2 border-[#CCFF00]/20 shadow-2xl">
-              <MatchSilo 
-                title="Match Center" 
-                subtitle="LIVE / HOY"
-                matches={partidasHoy} 
-                user={user} isAdmin={isAdmin}
-                activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-                setMapCenter={setMapCenter} 
-                onDelete={handleEliminarPartido}
-                onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
-              />
-              {partidasHoy.length === 0 && (
-                <div className="py-12 text-center border-2 border-dashed border-[#CCFF00]/10 rounded-3xl">
-                  <p className="text-[#CCFF00]/40 font-black italic uppercase tracking-[0.2em] text-xs">
-                    Nada para hoy todavía
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white/[0.02] p-6 rounded-[40px] border border-white/5 hover:border-[#CCFF00]/20 transition-all duration-500 order-3">
-            <MatchSilo 
-              title="Próximamente" 
-              subtitle="FUTURO / AGENDA"
-              matches={partidasFuturas} 
-              user={user} isAdmin={isAdmin}
-              activeMatchId={activeMatchId} setActiveMatchId={setActiveMatchId}
-              setMapCenter={setMapCenter} 
-              onDelete={handleEliminarPartido}
-              onSelect={(m) => { setSelectedPartido(m); setModalType('UNIRSE'); }}
-            />
-          </div>
-        </div>
-
-        <MatchMapLive
-          partidos={matchesFiltrados} 
-          mapCenter={mapCenter} 
-          activeMatchId={activeMatchId}
-          setActiveMatchId={setActiveMatchId}
-          neonIcon={neonIcon}
-        />
+        </details>
       </main>
 
       <MatchModals {...modalProps} />
