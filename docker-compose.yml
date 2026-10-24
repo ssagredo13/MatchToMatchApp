@@ -1,14 +1,17 @@
 services:
-  # Base de Datos Local (Opcional, ahora usaremos Atlas)
   mongodb:
-    image: mongo:latest
+    image: mongo:7
     container_name: mtm-db
     ports:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  # Backend FastAPI
   backend:
     build: ./backend
     container_name: mtm-backend
@@ -16,20 +19,26 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # --- CONEXIÓN A LA NUBE (ATLAS) ---
-      # IMPORTANTE: Reemplaza TU_PASSWORD_REAL por la contraseña de ssagredo13
-      - MONGO_URL=mongodb+srv://ssagredo13:ssagredo13@cluster0.jh8wz8e.mongodb.net/match-to-match?retryWrites=true&w=majority&appName=Cluster0
-      - DB_NAME=match_to_match
-    # Ya no necesita estrictamente el 'depends_on' de mongodb local porque apunta a la nube
+      MONGO_URL: ${MONGO_URL:-mongodb://mongodb:27017}
+      DB_NAME: ${DB_NAME:-match_to_match}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      PORT: ${PORT:-8000}
+    depends_on:
+      mongodb:
+        condition: service_healthy
 
-  # Frontend React
   frontend:
     build: ./frontend
     container_name: mtm-frontend
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     depends_on:
       - backend
 

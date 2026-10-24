@@ -1,4 +1,4 @@
-# ⚽ Match to Match (v2.1)
+# ⚽ Match to Match (v2.2)
 
 > ### ⚖️ AVISO DE PROPIEDAD INTELECTUAL Y RESERVA DE DERECHOS
 > **© 2026 Correlavoz Chile - Todos los derechos reservados.**
@@ -36,14 +36,15 @@ Este proyecto ha sido optimizado y co-desarrollado utilizando **Gemini 3 Flash**
 ## 🚀 Instalación y Desarrollo Local
 Para fines de mantenimiento autorizado o auditoría interna, el entorno se gestiona mediante **Docker Compose**:
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone [https://github.com/ssagredo13/MatchToMatchApp.git](https://github.com/ssagredo13/MatchToMatchApp.git)
-   
-Levantar servicios:
+1. Copiar `.env.example` a `.env` y completar `GOOGLE_CLIENT_ID` y `AUTH_SECRET_KEY`. Generar una clave de sesión aleatoria de al menos 32 caracteres; no reutilizar claves de Google ni MongoDB.
+2. Configurar el mismo OAuth Client ID en `GOOGLE_CLIENT_ID` y `VITE_GOOGLE_CLIENT_ID`.
+3. Ejecutar `docker compose up --build`.
 
-Bash
-docker-compose up -d --build
+El backend autentica el ID token de Google, crea/actualiza el usuario en MongoDB y devuelve una sesión firmada de corta duración. Las llamadas a equipos, partidos e instalaciones requieren esa sesión. `ALLOWED_ORIGINS` acepta una lista separada por comas de orígenes exactos; en producción debe contener el dominio HTTPS del frontend, sin comodines.
+
+En Render configura `MONGO_URL`, `DB_NAME`, `GOOGLE_CLIENT_ID`, `AUTH_SECRET_KEY`, `ADMIN_EMAILS` (opcional) y `ALLOWED_ORIGINS`. En Vercel configura `VITE_API_URL` con la URL HTTPS de Render y `VITE_GOOGLE_CLIENT_ID`. Las variables `VITE_*` se publican en el cliente; la clave de Maps debe restringirse por dominio y API y nunca considerarse secreta.
+
+Los archivos `.env` locales están excluidos de Git y de las imágenes Docker. Si una clave estuvo versionada o compartida, rotarla no elimina su exposición de la historia: revocarla y revisar el historial antes del despliegue.
 📁 Estructura del Proyecto
 Plaintext
 .

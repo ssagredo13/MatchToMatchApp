@@ -52,12 +52,12 @@ const Navbar = ({ user, onLogout }) => {
           {user ? (
             <div className="flex items-center gap-3 bg-white/5 p-1.5 pr-4 rounded-full border border-white/10">
               <img 
-                src={user.picture} 
+                src={user.picture || undefined}
                 alt="Avatar" 
                 className="w-8 h-8 rounded-full border border-[#CCFF00] object-cover"
               />
               <div className="hidden lg:block leading-none">
-                <p className="text-white text-[10px] font-bold uppercase italic">{user.name}</p>
+                <p className="text-white text-[10px] font-bold uppercase italic">{user.name || user.email}</p>
                 <p className="text-[#CCFF00] text-[8px] font-black tracking-widest mt-0.5">PRO PLAYER</p>
               </div>
               

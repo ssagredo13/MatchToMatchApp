@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import L from 'leaflet';
+import { apiFetch } from '../lib/api';
 
 // COMPONENTES MODULARIZADOS
 import Navbar from '../components/Navbar';
@@ -23,6 +24,7 @@ const Dashboard = ({ user, onLogout }) => {
   const [recintosOficiales, setRecintosOficiales] = useState([]);
   const [misEquipos, setMisEquipos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   
   const [filtro, setFiltro] = useState('TODOS');
   const [modalType, setModalType] = useState(null); 
@@ -38,47 +40,46 @@ const Dashboard = ({ user, onLogout }) => {
     jugadoresInvitados: 0, requiereArquero: false, canchaConfirmada: false 
   });
 
-  const isAdmin = user?.email === 'ssagredo13@gmail.com';
-  const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api";
-
-  // --- CARGA DE DATOS ---
-  const cargarPartidas = async () => {
+  const isAdmin = user?.role === 'admin';
+  const cargarPartidas = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/partidos`);
-      if (res.ok) setPartidos(await res.json());
-    } catch (err) {
-      console.error("Error cargando partidas:", err);
+      const data = await apiFetch('/api/partidos');
+      setPartidos(data);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error.message || 'No se pudieron cargar las partidas.');
     }
-  };
+  }, []);
+
+  const cargarDatosBase = useCallback(async () => {
+    if (!user?.email) return;
+    setLoading(true);
+    try {
+      const [recintos, equipos] = await Promise.all([
+        apiFetch('/api/recintos'),
+        apiFetch(`/api/equipos?email=${encodeURIComponent(user.email)}`),
+      ]);
+      setRecintosOficiales(recintos);
+      setMisEquipos(equipos);
+      await cargarPartidas();
+    } catch (error) {
+      setLoadError(error.message || 'No se pudieron cargar los datos del dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.email, cargarPartidas]);
 
   useEffect(() => {
-    const cargarDatosBase = async () => {
-      setLoading(true);
-      try {
-        const [resRecintos, resEquipos] = await Promise.all([
-          fetch(`${API_URL}/recintos`),
-          fetch(`${API_URL}/equipos?email=${user.email}`)
-        ]);
-        if (resRecintos.ok) setRecintosOficiales(await resRecintos.json());
-        if (resEquipos.ok) setMisEquipos(await resEquipos.json());
-        await cargarPartidas();
-      } catch (err) {
-        console.error("⚠️ Error conectando al backend:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user?.email) cargarDatosBase();
-  }, [user.email, API_URL]);
+    cargarDatosBase();
+  }, [cargarDatosBase]);
 
   useEffect(() => {
     const intervalo = setInterval(cargarPartidas, 30000);
     return () => clearInterval(intervalo);
-  }, []);
+  }, [cargarPartidas]);
 
   // --- HANDLERS ---
   const handleCrearPartida = async () => {
-    const eq = misEquipos.find(e => (e._id || e.id) === formPartida.equipoId);
     const iniciales = Number(formPartida.jugadoresInvitados) || 1; 
     const totalCupos = Number(formPartida.jugadoresPorLado) * 2;
 
@@ -93,10 +94,7 @@ const Dashboard = ({ user, onLogout }) => {
     }
 
     const nuevaPartida = {
-      equipo: eq?.nombre || "Sin Equipo",
       equipoId: String(formPartida.equipoId),
-      creadorEmail: user.email,
-      creadorNombre: user.nombreReal || user.name || "Organizador",
       recinto: formPartida.recinto,
       lat: parseFloat(formPartida.lat),
       lng: parseFloat(formPartida.lng),
@@ -106,26 +104,18 @@ const Dashboard = ({ user, onLogout }) => {
       jugadores: iniciales, 
       total: totalCupos,
       arqueroFaltante: !!formPartida.requiereArquero,
-      jugadoresInscritos: [user.email],
-      estado: formPartida.tipo === 'RIVAL' ? 'BUSCANDO RIVAL' : 'BUSCANDO JUGADORES',
-      activo: true 
     };
 
     try {
-      const res = await fetch(`${API_URL}/partidos`, {
+      const guardada = await apiFetch('/api/partidos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nuevaPartida)
       });
-
-      if (res.ok) {
-        const guardada = await res.json();
-        setPartidos([guardada, ...partidos]);
-        setModalType(null);
-        alert("✅ Partida publicada exitosamente");
-      }
+      setPartidos(prev => [guardada, ...prev]);
+      setModalType(null);
+      setLoadError('');
     } catch (error) {
-      alert("❌ Error de red.");
+      setLoadError(error.message || 'No se pudo publicar la partida.');
     }
   };
 
@@ -134,43 +124,29 @@ const Dashboard = ({ user, onLogout }) => {
     if (!window.confirm("¿Estás seguro de que quieres cancelar esta partida?")) return;
 
     try {
-      const res = await fetch(`${API_URL}/partidos/${pId}/cancelar`, { 
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (res.ok) {
-        setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
-        console.log("✅ Partido cancelado exitosamente");
-      } else {
-        const error = await res.json();
-        alert(`❌ No se pudo cancelar: ${error.detail || 'Error en servidor'}`);
-      }
+      await apiFetch(`/api/partidos/${pId}/cancelar`, { method: 'PATCH' });
+      setPartidos(prev => prev.filter(p => (p._id || p.id) !== pId));
+      setLoadError('');
     } catch (error) {
-      console.error("Error de red al cancelar:", error);
-      alert("❌ Error de conexión al intentar cancelar.");
+      setLoadError(error.message || 'No se pudo cancelar el partido.');
     }
   };
 
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
     try {
-      const payload = mode === 'PLAYER' 
-        ? { nuevoJugadorEmail: user.email }
-        : { rival: equipoData.nombre, estado: "PARTIDO LISTO", jugadores: 12 };
+      const payload = mode === 'PLAYER'
+        ? { action: 'join' }
+        : { action: 'challenge', rival_team_id: equipoData?.id || equipoData?._id };
 
-      const res = await fetch(`${API_URL}/partidos/${pId}`, {
+      const partidoActualizado = await apiFetch(`/api/partidos/${pId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
-      if (res.ok) {
-        const partidoActualizado = await res.json();
-        setPartidos(prev => prev.map(p => (p._id || p.id) === pId ? partidoActualizado : p));
-        setModalType(null);
-      }
+      setPartidos(prev => prev.map(p => (p._id || p.id) === pId ? partidoActualizado : p));
+      setModalType(null);
+      setLoadError('');
     } catch (error) {
-      console.error("Error uniendo al match:", error);
+      setLoadError(error.message || 'No se pudo actualizar la partida.');
     }
   };
 
@@ -211,20 +187,22 @@ const Dashboard = ({ user, onLogout }) => {
   partidasPasadas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   const modalProps = {
-    user, modalType, setModalType, selectedPartido, handleUnirseMatch,
+    modalType, setModalType, selectedPartido, handleUnirseMatch,
+    errorMessage: loadError,
     misEquipos, step, setStep, formPartida, setFormPartida,
-    handleCrearPartida, nuevoEquipo, setNuevoEquipo, setMisEquipos,
+    handleCrearPartida, nuevoEquipo, setNuevoEquipo,
     recintosOficiales, handleCrearEquipoDB: async (n) => {
-        const nuevo = { nombre: n, creadorEmail: user.email };
-        const res = await fetch(`${API_URL}/equipos`, {
+        try {
+          const creado = await apiFetch('/api/equipos', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(nuevo)
-        });
-        if (res.ok) {
-            const g = await res.json();
-            setMisEquipos(prev => [...prev, g]);
-            return g;
+            body: JSON.stringify({ nombre: n })
+          });
+          setMisEquipos(prev => [...prev, creado]);
+          setLoadError('');
+          return creado;
+        } catch (error) {
+          setLoadError(error.message || 'No se pudo crear el equipo.');
+          throw error;
         }
     }
   };
@@ -259,6 +237,18 @@ const Dashboard = ({ user, onLogout }) => {
         </header>
 
         <MatchFilters filtro={filtro} setFiltro={setFiltro} />
+        {loadError && (
+          <div role="alert" className="mb-6 rounded-xl border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-200">
+            {loadError}
+            <button
+              type="button"
+              onClick={cargarDatosBase}
+              className="ml-3 underline underline-offset-4"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mb-20">
           

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Loader2, Plus, Users, Trophy } from 'lucide-react';
 import MatchModals from '../components/MatchModals';
+import { apiFetch } from '../lib/api';
 
 const MyTeams = ({ user }) => {
   const [equipos, setEquipos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [nuevoEquipo, setNuevoEquipo] = useState('');
   const [modalType, setModalType] = useState(null);
   const [step, setStep] = useState(1);
@@ -13,58 +15,37 @@ const MyTeams = ({ user }) => {
     equipoId: '', recinto: '', hora: '', fecha: '', tipo: 'JUGADORES'
   });
 
-  // CORRECCIÓN: Priorizar la variable de entorno de Vite. 
-  // Nota: En el navegador siempre usamos 'localhost' porque es TU PC el que hace la petición.
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-  const fetchEquipos = async () => {
+  const fetchEquipos = useCallback(async () => {
     if (!user?.email) return;
     setLoading(true);
     try {
-      // Agregamos /api si no viene en la URL base
-      const url = `${API_URL}/api/equipos?email=${user.email}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setEquipos(data);
-      } else {
-        console.error("Respuesta del servidor no OK:", res.status);
-      }
+      const data = await apiFetch(`/api/equipos?email=${encodeURIComponent(user.email)}`);
+      setEquipos(data);
+      setError('');
     } catch (error) {
-      console.error("Error cargando equipos:", error);
+      setError(error.message || 'No se pudieron cargar los equipos.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.email]);
 
   useEffect(() => {
     fetchEquipos();
-  }, [user?.email]);
+  }, [fetchEquipos]);
 
   const handleCrearEquipoDB = async (nombreDelNuevoEquipo) => {
     try {
-      const res = await fetch(`${API_URL}/api/equipos`, {
+      const guardado = await apiFetch('/api/equipos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: nombreDelNuevoEquipo,
-          creadorEmail: user.email
-        })
+        body: JSON.stringify({ nombre: nombreDelNuevoEquipo })
       });
 
-      if (res.ok) {
-        const guardado = await res.json();
-        await fetchEquipos(); 
-        return guardado; 
-      } else {
-        const errorData = await res.json();
-        alert(`Error: ${errorData.detail || "No se pudo crear el equipo"}`);
-      }
+      setEquipos(prev => [...prev, guardado]);
+      return guardado;
     } catch (error) {
-      console.error("Error en POST:", error);
-      alert("Error al conectar con el servidor (Verifica que el Backend esté corriendo)");
+      setError(error.message || 'No se pudo crear el equipo.');
+      throw error;
     }
-    return null;
   };
 
   // ... (El resto del render se mantiene igual)
@@ -95,6 +76,14 @@ const MyTeams = ({ user }) => {
             <Plus size={20} strokeWidth={3} /> Crear Club
           </button>
         </div>
+        {error && (
+          <div role="alert" className="mb-6 rounded-xl border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-200">
+            {error}
+            <button type="button" onClick={fetchEquipos} className="ml-3 underline underline-offset-4">
+              Reintentar
+            </button>
+          </div>
+        )}
 
         {equipos.length === 0 ? (
           <div className="border border-white/5 bg-white/5 rounded-[32px] p-20 text-center">
@@ -123,7 +112,7 @@ const MyTeams = ({ user }) => {
       </main>
 
       <MatchModals 
-        user={user}
+        errorMessage={error}
         modalType={modalType}
         setModalType={setModalType}
         step={step}
@@ -131,7 +120,6 @@ const MyTeams = ({ user }) => {
         nuevoEquipo={nuevoEquipo}
         setNuevoEquipo={setNuevoEquipo}
         misEquipos={equipos}
-        setMisEquipos={setEquipos}
         handleCrearEquipoDB={handleCrearEquipoDB}
         formPartida={formPartida} 
         setFormPartida={setFormPartida}

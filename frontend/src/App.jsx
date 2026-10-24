@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
+import { apiFetch } from './lib/api';
 
 // Vistas
 import Dashboard from './pages/Dashboard';
@@ -10,87 +10,134 @@ import MyTeams from './pages/MyTeams';
 import Historial from './pages/Historial'; 
 import Navbar from './components/Navbar';
 
-function App() {
-  const [user, setUser] = useState(null);
-
-  // Cargar usuario desde LocalStorage al iniciar
-  useEffect(() => {
+const getSavedUser = () => {
+  try {
+    if (!sessionStorage.getItem('access_token')) {
+      localStorage.removeItem('user');
+      return null;
+    }
     const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        localStorage.removeItem('user');
+    if (!savedUser) return null;
+
+    const parsedUser = JSON.parse(savedUser);
+    const email = typeof parsedUser.email === 'string' ? parsedUser.email.trim().toLowerCase() : '';
+    if (!email) {
+      localStorage.removeItem('user');
+      return null;
+    }
+
+    return {
+      id: parsedUser.id,
+      email,
+      name: parsedUser.name || parsedUser.nombre || parsedUser.nombreReal || email,
+      picture: parsedUser.picture || parsedUser.foto || '',
+      role: parsedUser.role || parsedUser.rol || 'jugador',
+    };
+  } catch (error) {
+    console.error('No se pudo recuperar la sesión guardada:', error);
+    try {
+      localStorage.removeItem('user');
+    } catch (storageError) {
+      console.error('No se pudo limpiar la sesión local inválida:', storageError);
+    }
+    return null;
+  }
+};
+
+function App() {
+  const [user, setUser] = useState(getSavedUser);
+  const [authError, setAuthError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  const handleLoginSuccess = async (credentialResponse) => {
+    setAuthError('');
+    setIsAuthenticating(true);
+    try {
+      if (!credentialResponse.credential) {
+        throw new Error('Google no entregó una credencial válida. Intenta nuevamente.');
       }
+
+      const authResponse = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      }, { authenticated: false });
+
+      const backendUser = authResponse?.user;
+      if (!authResponse?.access_token || !backendUser?.email) {
+        throw new Error('El servidor devolvió una sesión incompleta.');
+      }
+
+      const authenticatedUser = {
+        id: backendUser.id,
+        email: backendUser.email.trim().toLowerCase(),
+        name: backendUser.nombre || backendUser.email,
+        picture: backendUser.foto || '',
+        role: backendUser.rol || 'jugador',
+      };
+      try {
+        sessionStorage.setItem('access_token', authResponse.access_token);
+        localStorage.setItem('user', JSON.stringify(authenticatedUser));
+      } catch (storageError) {
+        try {
+          sessionStorage.removeItem('access_token');
+        } catch (cleanupError) {
+          console.error('No se pudo limpiar la sesión incompleta:', cleanupError);
+        }
+        throw new Error('No se pudo guardar la sesión en este navegador.', { cause: storageError });
+      }
+      setUser(authenticatedUser);
+    } catch (error) {
+      console.error('Fallo en el inicio de sesión:', error);
+      setAuthError(error instanceof Error ? error.message : 'No se pudo iniciar sesión. Intenta nuevamente.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    try {
+      sessionStorage.removeItem('access_token');
+    } catch (error) {
+      console.error('No se pudo limpiar el token local:', error);
+    }
+    try {
+      localStorage.removeItem('user');
+    } catch (error) {
+      console.error('No se pudo limpiar el perfil local:', error);
     }
   }, []);
 
-  /**
-   * Manejador de éxito de Google Login con persistencia en Atlas
-   */
-  const handleLoginSuccess = async (credentialResponse) => {
-    try {
-      const decoded = jwtDecode(credentialResponse.credential);
-      const userData = {
-        ...decoded,
-        nombreReal: decoded.name || decoded.given_name || "Organizador"
-      };
+  useEffect(() => {
+    window.addEventListener('session-expired', handleLogout);
+    return () => window.removeEventListener('session-expired', handleLogout);
+  }, [handleLogout]);
 
-      // URL Dinámica: Usa la variable de entorno de Vercel o el localhost si estás en desarrollo
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'; 
-      
-      console.log("Persistiendo usuario en backend...");
-
-      // Llamada al endpoint de autenticación para guardar en MongoDB Atlas
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: decoded.email,
-          displayName: userData.nombreReal,
-          photoURL: decoded.picture
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error("Error en la respuesta del servidor");
-      }
-
-      const backendData = await response.json();
-      console.log("Usuario sincronizado con Atlas:", backendData);
-
-      // Guardar en estado y LocalStorage solo tras éxito en backend
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-
-    } catch (error) {
-      console.error("Fallo en la persistencia de usuario:", error);
-      // Opcional: Podrías alertar al usuario si el backend está caído
-    }
+  const handleGoogleError = () => {
+    setAuthError('Google no pudo autenticar tu cuenta. Intenta nuevamente.');
   };
 
-  /**
-   * Manejador de Logout
-   */
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-  };
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
   return (
-    <GoogleOAuthProvider clientId="954066819953-l2nrbmtvaq74l6q4820tp0d5015ibuaf.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={googleClientId}>
       <BrowserRouter>
-        {/* Navbar solo se muestra si hay sesión activa */}
         {user && <Navbar user={user} onLogout={handleLogout} />}
         
         <Routes>
-          {/* Ruta raíz: Si no hay usuario va a Landing, si lo hay va a Dashboard */}
           <Route 
             path="/" 
-            element={!user ? <Landing onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/dashboard" />} 
+            element={!user ? (
+              <Landing
+                onLoginSuccess={handleLoginSuccess}
+                onGoogleError={handleGoogleError}
+                authError={authError}
+                isAuthenticating={isAuthenticating}
+                googleClientIdConfigured={Boolean(googleClientId)}
+              />
+            ) : <Navigate to="/dashboard" />}
           />
           
-          {/* Rutas Protegidas */}
           <Route 
             path="/dashboard" 
             element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
@@ -106,7 +153,6 @@ function App() {
             element={user ? <Historial user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
           />
 
-          {/* Redirección por defecto */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>

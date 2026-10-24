@@ -1,9 +1,9 @@
 // src/pages/Landing.jsx
 import React from 'react';
 import { GoogleLogin } from '@react-oauth/google';
-import { Trophy, Target, Zap } from 'lucide-react';
+import { Target } from 'lucide-react';
 
-const Landing = ({ onLoginSuccess }) => (
+const Landing = ({ onLoginSuccess, onGoogleError, authError, isAuthenticating, googleClientIdConfigured }) => (
   <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden">
     
     {/* FONDO DE IMPACTO: Collage / Imagen de Cancha con Overlay */}
@@ -57,13 +57,33 @@ const Landing = ({ onLoginSuccess }) => (
               Acceso <span className="text-[#CCFF00]">Pro Player</span>
             </p>
             
-            <GoogleLogin 
-              onSuccess={onLoginSuccess}
-              onError={() => console.log('Login Failed')}
-              useOneTap
-              theme="filled_blue"
-              shape="pill"
-            />
+            {googleClientIdConfigured ? (
+              <>
+                {isAuthenticating && (
+                  <p role="status" className="mt-4 text-xs font-bold text-[#CCFF00]">
+                    Verificando tu cuenta...
+                  </p>
+                )}
+                {!isAuthenticating && (
+                  <GoogleLogin
+                    onSuccess={onLoginSuccess}
+                    onError={onGoogleError}
+                    useOneTap
+                    theme="filled_blue"
+                    shape="pill"
+                  />
+                )}
+              </>
+            ) : (
+              <p role="alert" className="max-w-xs text-sm font-bold text-amber-300">
+                El inicio de sesión no está configurado. Intenta más tarde.
+              </p>
+            )}
+            {authError && (
+              <p role="alert" className="mt-4 max-w-xs text-sm font-bold text-red-300">
+                {authError}
+              </p>
+            )}
           </div>
         </div>
 

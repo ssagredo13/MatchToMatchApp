@@ -2,16 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Dependencias del sistema para librerías de red
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+RUN useradd --system --create-home --shell /usr/sbin/nologin app
+COPY --chown=app:app app ./app
+USER app
 
-#CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-# Si main.py está dentro de una carpeta llamada 'app'
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
+EXPOSE 8000
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

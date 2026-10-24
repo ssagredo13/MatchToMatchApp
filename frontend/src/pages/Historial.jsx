@@ -1,43 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import MatchCard from '../components/MatchCard';
 import { Loader2 } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 
 const Historial = ({ user, onLogout }) => {
   const [partidosPasados, setPartidosPasados] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // URL Dinámica según el entorno
-  const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api";
+  const [error, setError] = useState('');
+
+  const cargarHistorial = useCallback(async () => {
+    if (!user?.email) return;
+    setLoading(true);
+    try {
+      const todos = await apiFetch(
+        `/api/partidos?solo_activos=false&email=${encodeURIComponent(user.email)}`
+      );
+      setPartidosPasados(todos.filter(p => p.activo === false));
+      setError('');
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar el historial.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.email]);
 
   useEffect(() => {
-    const cargarHistorial = async () => {
-      setLoading(true);
-      try {
-        // CORRECCIÓN: Usamos 'solo_activos=false' para que el backend no filtre los cancelados
-        // y pasamos el email para que el backend haga el filtro de pertenencia directamente.
-        const url = `${API_URL}/partidos?solo_activos=false&email=${user.email}`;
-        const res = await fetch(url);
-        
-        if (res.ok) {
-          const todos = await res.json();
-          
-          // Filtramos en el cliente para mostrar solo lo que NO está activo (Historial Real)
-          const misPartidosNoActivos = todos.filter(p => p.activo === false);
-          
-          setPartidosPasados(misPartidosNoActivos);
-        }
-      } catch (err) {
-        console.error("Error cargando el historial:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user?.email) {
-      cargarHistorial();
-    }
-  }, [user.email, API_URL]);
+    cargarHistorial();
+  }, [cargarHistorial]);
 
   if (loading) return (
     <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center gap-4">
@@ -57,6 +47,15 @@ const Historial = ({ user, onLogout }) => {
             Mi <span className="opacity-10">Historial</span>
           </h1>
         </div>
+
+        {error && (
+          <div role="alert" className="mb-6 rounded-xl border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-200">
+            {error}
+            <button type="button" onClick={cargarHistorial} className="ml-3 underline underline-offset-4">
+              Reintentar
+            </button>
+          </div>
+        )}
 
         {partidosPasados.length === 0 ? (
           <div className="border border-white/5 bg-white/5 p-20 text-center rounded-[48px]">

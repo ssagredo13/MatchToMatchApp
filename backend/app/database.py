@@ -1,48 +1,34 @@
-import motor.motor_asyncio
-import os
-from dotenv import load_dotenv
+from pymongo import AsyncMongoClient
+from pymongo.errors import PyMongoError
 
-# Cargamos variables de entorno (.env)
-load_dotenv()
+from app.config import settings
 
-# --- CONFIGURACIÓN DE URL ---
-# Prioriza la URL de MongoDB Atlas (en Render) o la de Docker (mtm-db) en local.
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://mtm-db:27017")
 
-# --- CLIENTE MOTOR (ASYNC) ---
-# Configuramos timeouts para detectar fallos de red rápidamente
-client = motor.motor_asyncio.AsyncIOMotorClient(
-    MONGO_URL,
+client = AsyncMongoClient(
+    settings.mongo_url,
     serverSelectionTimeoutMS=5000, # 5 seg para encontrar el servidor
     connectTimeoutMS=10000         # 10 seg para establecer conexión
 )
 
-# --- BASE DE DATOS Y COLECCIONES ---
-DB_NAME = os.getenv("DB_NAME", "match_to_match")
-db = client[DB_NAME]
+db = client[settings.db_name]
 
-# Colecciones exportables (Usamos nombres descriptivos para las rutas)
 recintos_col = db.get_collection("recintos")
 equipos_col = db.get_collection("equipos")
 partidos_col = db.get_collection("partidos")
 usuarios_col = db.get_collection("usuarios")
 
-# --- UTILIDADES DE FORMATO ---
-def format_mongo_doc(doc):
-    """
-    Convierte el '_id' de MongoDB (ObjectId) a un string 'id' 
-    para que sea compatible con el Frontend (JSON).
-    """
-    if not doc: 
-        return None
-    doc["id"] = str(doc.pop("_id"))
-    return doc
 
-# --- MONITOREO ---
+def format_mongo_doc(doc):
+    if not doc:
+        return None
+    formatted = {key: value for key, value in doc.items() if key != "_id"}
+    formatted["id"] = str(doc["_id"])
+    return formatted
+
+
 async def ping_db():
-    """Verifica si la base de datos está respondiendo."""
     try:
-        await client.admin.command('ping')
+        await client.admin.command("ping")
         return True
-    except Exception:
+    except PyMongoError:
         return False

@@ -88,7 +88,7 @@ const MatchCard = ({ partido, isActive, isAdmin, onSelect, onDelete, user }) => 
 
         <div className="flex items-center gap-2">
           {/* BOTÓN ELIMINAR: Deshabilitado si es fallida/pasada */}
-          {isHost && !esFallida && (
+          {(isHost || isAdmin) && !esFallida && (
             <button
               onClick={(e) => {
                 e.preventDefault();

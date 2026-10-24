@@ -1,41 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Search, MapPin, Loader2 } from 'lucide-react';
 
 const RecintoSelector = ({ onSelectRecinto, onInputChange, defaultValue }) => {
   const [query, setQuery] = useState(defaultValue || '');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
   // Función para buscar en OpenStreetMap (Nominatim)
-  const searchAddress = async (text) => {
+  const searchAddress = useCallback(async (text, signal) => {
     if (text.length < 3) {
       setResults([]);
       return;
     }
 
     setLoading(true);
+    setError('');
+    setResults([]);
     try {
       // Limitamos la búsqueda a Chile para mayor precisión
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&countrycodes=cl&addressdetails=1&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&countrycodes=cl&addressdetails=1&limit=5`,
+        { signal }
       );
+      if (!response.ok) {
+        throw new Error(`No se pudo buscar la dirección (${response.status}).`);
+      }
       const data = await response.json();
       setResults(data);
     } catch (error) {
-      console.error("Error buscando dirección:", error);
+      if (error.name === 'AbortError') return;
+      setError(error.message || 'No se pudo realizar la búsqueda.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Debounce simple para no saturar el servidor gratuito
   useEffect(() => {
+    if (query.length < 3 || !showDropdown) return undefined;
+
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      if (query && showDropdown) searchAddress(query);
+      searchAddress(query, controller.signal);
     }, 500);
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, showDropdown, searchAddress]);
 
   return (
     <div className="relative w-full">
@@ -53,6 +67,10 @@ const RecintoSelector = ({ onSelectRecinto, onInputChange, defaultValue }) => {
             const val = e.target.value;
             setQuery(val);
             setShowDropdown(true);
+            if (val.length < 3) {
+              setResults([]);
+              setError('');
+            }
             if (onInputChange) onInputChange(val); // Esto desbloquea el botón
           }}
           onFocus={() => setShowDropdown(true)}
@@ -87,7 +105,7 @@ const RecintoSelector = ({ onSelectRecinto, onInputChange, defaultValue }) => {
           ))}
           {results.length === 0 && !loading && (
             <div className="p-4 text-[10px] text-slate-500 font-bold uppercase italic text-center">
-              No se encontraron resultados oficiales
+              {error || 'No se encontraron resultados'}
             </div>
           )}
         </div>

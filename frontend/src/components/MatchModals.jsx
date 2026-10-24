@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import { X, UserPlus, Swords, Calendar, MapPin, ChevronRight, Clock, CheckCircle, Loader2 } from 'lucide-react';
 import RecintoSelector from './RecintoSelector';
-
-export const RECINTOS_OFICIALES = [
-  { id: 'r1', nombre: "GREEN CLUB", ciudad: "TALCA", direccion: "24 Norte 1245", lat: -35.4120, lng: -71.6420 },
-  { id: 'r2', nombre: "ESTADIO FISCAL", ciudad: "TALCA", direccion: "Alameda 251", lat: -35.4264, lng: -71.6554 },
-  { id: 'r3', nombre: "CANCHITA 7", ciudad: "TALCA", direccion: "Av. Colín 0830", lat: -35.4410, lng: -71.6710 },
-];
+import { RECINTOS } from '../data/recintos';
 
 const MatchModals = ({ 
-  user, modalType, setModalType, selectedPartido, handleUnirseMatch, 
+  modalType, setModalType, selectedPartido, handleUnirseMatch,
   misEquipos, step, setStep, formPartida, setFormPartida, 
-  handleCrearPartida, nuevoEquipo, setNuevoEquipo, setMisEquipos,
+  handleCrearPartida, nuevoEquipo, setNuevoEquipo, errorMessage,
   handleCrearEquipoDB 
 }) => {
   
@@ -30,6 +25,11 @@ const MatchModals = ({
       />
 
       <div className="relative bg-[#0b1224] border border-white/10 w-full max-w-xl rounded-[40px] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]">
+        {errorMessage && (
+          <p role="alert" className="mx-8 mt-8 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
+            {errorMessage}
+          </p>
+        )}
         
         {/* MODAL UNIRSE / RETAR */}
         {modalType === 'UNIRSE' && selectedPartido && (
@@ -160,7 +160,7 @@ const MatchModals = ({
                   <RecintoSelector 
                     defaultValue={formPartida.recinto}
                     onSelectRecinto={(datos) => {
-                      const coincidencia = RECINTOS_OFICIALES.find(
+                      const coincidencia = RECINTOS.find(
                         r => r.nombre.toUpperCase() === datos.nombre.toUpperCase()
                       );
                       setFormPartida({
