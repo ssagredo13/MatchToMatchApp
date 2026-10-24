@@ -44,6 +44,8 @@ El backend autentica el ID token de Google, crea/actualiza el usuario en MongoDB
 
 En Render configura `MONGO_URL`, `DB_NAME`, `GOOGLE_CLIENT_ID`, `AUTH_SECRET_KEY`, `ADMIN_EMAILS` (opcional) y `ALLOWED_ORIGINS`. En Vercel configura `VITE_API_URL` con la URL HTTPS de Render y `VITE_GOOGLE_CLIENT_ID`. Las variables `VITE_*` se publican en el cliente; la clave de Maps debe restringirse por dominio y API y nunca considerarse secreta.
 
+`VITE_API_URL` debe ser el origen del servicio Render, por ejemplo `https://nombre-del-servicio.onrender.com`; no uses `localhost` ni añadas `/api`. El cliente elimina automáticamente un `/api` final para evitar rutas duplicadas. Si Render informa `bad auth: authentication failed`, actualiza `MONGO_URL` en Render con el usuario y contraseña vigentes de MongoDB Atlas; codifica como URL los caracteres especiales de las credenciales. Confirma también que el usuario Atlas tenga permisos de lectura/escritura y que el acceso de red permita conexiones desde Render. Después de guardar variables de entorno en Vercel, vuelve a desplegar para que Vite las incorpore al build.
+
 Los archivos `.env` locales están excluidos de Git y de las imágenes Docker. Si una clave estuvo versionada o compartida, rotarla no elimina su exposición de la historia: revocarla y revisar el historial antes del despliegue.
 📁 Estructura del Proyecto
 Plaintext

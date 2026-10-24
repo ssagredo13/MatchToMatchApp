@@ -16,11 +16,19 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await usuarios_col.create_index("email", unique=True)
-    await equipos_col.create_index(
-        [("creadorEmail", 1), ("nombre", 1)],
-        unique=True,
-    )
+    try:
+        await usuarios_col.create_index("email", unique=True)
+        await equipos_col.create_index(
+            [("creadorEmail", 1), ("nombre", 1)],
+            unique=True,
+        )
+    except PyMongoError:
+        logger.exception(
+            "Database initialization failed. Check Render's MONGO_URL, Atlas database "
+            "user credentials/roles, and network access. URL-encode special characters "
+            "in the username or password."
+        )
+        raise
     yield
     await client.close()
 

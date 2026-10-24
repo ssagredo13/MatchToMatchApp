@@ -1,4 +1,7 @@
-const configuredApiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '');
+const configuredApiUrl = import.meta.env.VITE_API_URL
+  ?.trim()
+  .replace(/\/+$/, '')
+  .replace(/\/api$/i, '');
 const apiBaseUrl = configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 export async function apiFetch(path, options = {}, { authenticated = true } = {}) {
@@ -49,7 +52,10 @@ export async function apiFetch(path, options = {}, { authenticated = true } = {}
     try {
       responseData = JSON.parse(responseText);
     } catch (error) {
-      throw new Error('El servidor devolvió una respuesta no válida.', { cause: error });
+      throw new Error(
+        `La API devolvió una respuesta no válida (${response.status}). Verifica VITE_API_URL y que Render esté activo.`,
+        { cause: error },
+      );
     }
   }
 
