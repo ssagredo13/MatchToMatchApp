@@ -17,15 +17,23 @@ class Settings(BaseSettings):
     auth_secret_key: str | None = None
     admin_emails: str = ""
     allowed_origins: str = "http://localhost:5173"
+    production_frontend_origin: str = "https://match-to-match-app.vercel.app"
 
     @property
     def cors_origins(self) -> list[str]:
-        origins = [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
+        origins = {
+            origin.strip().rstrip("/")
+            for origin in (
+                *self.allowed_origins.split(","),
+                self.production_frontend_origin,
+            )
+            if origin.strip()
+        }
         if not origins:
             raise ValueError("ALLOWED_ORIGINS must contain at least one origin")
         if "*" in origins:
             raise ValueError("ALLOWED_ORIGINS must not contain a wildcard")
-        return origins
+        return sorted(origins)
 
     @property
     def configured_admin_emails(self) -> set[str]:

@@ -25,6 +25,7 @@ services:
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      PRODUCTION_FRONTEND_ORIGIN: ${PRODUCTION_FRONTEND_ORIGIN:-https://match-to-match-app.vercel.app}
       PORT: ${PORT:-8000}
     depends_on:
       mongodb:
