@@ -19,10 +19,10 @@ const MatchCard = ({ partido, isActive, isAdmin, onSelect, onDelete, user }) => 
       className={`
         relative p-6 rounded-[32px] border transition-all duration-500 overflow-hidden group
         ${esFallida 
-          ? 'bg-slate-950/40 border-white/5 cursor-default opacity-50 grayscale' 
+          ? 'bg-slate-950 border-white/10 cursor-default opacity-80 grayscale-[0.15]'
           : isActive 
             ? 'bg-[#0f172a] border-[#CCFF00] shadow-[0_0_40px_rgba(204,255,0,0.15)] scale-[1.02] cursor-pointer' 
-            : 'bg-[#0f172a]/40 border-white/5 hover:border-white/20 hover:bg-[#0f172a]/60 cursor-pointer'}
+            : 'bg-[#0f172a] border-white/10 hover:border-white/25 hover:bg-[#111c32] cursor-pointer'}
       `}
     >
       {/* HEADER */}
@@ -48,7 +48,7 @@ const MatchCard = ({ partido, isActive, isAdmin, onSelect, onDelete, user }) => 
         
         <span className={`px-4 py-1.5 rounded-full text-[9px] font-black italic uppercase tracking-[0.15em] border ${
           esFallida 
-            ? 'bg-red-500/5 text-red-900 border-red-900/20'
+            ? 'bg-red-500/10 text-red-300 border-red-400/20'
             : partido.estado === 'PARTIDO LISTO' 
               ? 'bg-green-500/10 text-green-400 border-green-500/20' 
               : 'bg-[#CCFF00]/10 text-[#CCFF00] border-[#CCFF00]/20'
@@ -74,7 +74,7 @@ const MatchCard = ({ partido, isActive, isAdmin, onSelect, onDelete, user }) => 
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <Users size={14} className={esFallida ? "text-slate-800" : "text-[#CCFF00]"} />
-            <span className={`text-[10px] font-black italic uppercase ${esFallida ? 'text-slate-700' : 'text-white/70'}`}>
+            <span className={`text-[10px] font-black italic uppercase ${esFallida ? 'text-slate-400' : 'text-white/85'}`}>
               {partido.jugadores} / {partido.total}
             </span>
           </div>

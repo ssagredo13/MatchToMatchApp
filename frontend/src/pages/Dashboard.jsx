@@ -5,8 +5,8 @@ import { apiFetch } from '../lib/api';
 // COMPONENTES MODULARIZADOS
 import Navbar from '../components/Navbar';
 import MatchModals from '../components/MatchModals';
-import MatchSilo from '../components/Dashboard/MatchSilo';
 import MatchRadar from '../components/Dashboard/MatchRadar';
+import PastMatchList from '../components/Dashboard/PastMatchList';
 
 const Dashboard = ({ user, onLogout }) => {
   // --- ESTADOS ---
@@ -280,26 +280,14 @@ const Dashboard = ({ user, onLogout }) => {
           }}
         />
 
-        <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+        <details className="mt-8 rounded-2xl border border-white/10 bg-[#080e1d] p-5">
           <summary className="cursor-pointer text-sm font-black italic uppercase tracking-wide text-slate-300 marker:text-[#CCFF00]">
             Historial reciente · {partidasPasadas.length}
           </summary>
-          <div className="mt-6">
-            <MatchSilo
-              title="Tus partidos anteriores"
-              subtitle="PASADO / RECIENTE"
+          <div className="mt-4">
+            <PastMatchList
               matches={partidasPasadas.slice(0, 8)}
-              user={user}
-              isAdmin={isAdmin}
-              activeMatchId={activeMatchId}
-              setActiveMatchId={setActiveMatchId}
-              setMapCenter={setMapCenter}
-              onDelete={handleEliminarPartido}
-              onSelect={(match) => {
-                if (match.estadoEspecial === 'FALLIDA') return;
-                setSelectedPartido(match);
-                setModalType('UNIRSE');
-              }}
+              emptyMessage="Tu historial aparecerá aquí cuando tengas partidos anteriores."
             />
           </div>
         </details>

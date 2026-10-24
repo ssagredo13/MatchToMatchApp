@@ -17,6 +17,8 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import MatchFilters from './MatchFilters';
+import FootballAtmosphere from './FootballAtmosphere';
+import { playRefereeWhistle } from '../../lib/footballSound';
 
 const TALCA_CENTER = [-35.4264, -71.6554];
 
@@ -85,6 +87,8 @@ const MatchRadar = ({
   const [nearbyLocation, setNearbyLocation] = useState(null);
   const [locationMessage, setLocationMessage] = useState('');
   const [locating, setLocating] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundMessage, setSoundMessage] = useState('');
 
   const matches = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('es-CL');
@@ -154,10 +158,38 @@ const MatchRadar = ({
     if (isValidCoordinate(match.lat) && isValidCoordinate(match.lng)) {
       setMapCenter([Number(match.lat), Number(match.lng)]);
     }
+    if (soundEnabled) {
+      playRefereeWhistle().catch(() => {
+        setSoundEnabled(false);
+        setSoundMessage('No se pudo reproducir audio. El radar sigue disponible sin sonido.');
+      });
+    }
+  };
+
+  const toggleSound = async () => {
+    if (soundEnabled) {
+      setSoundEnabled(false);
+      setSoundMessage('Silbato desactivado.');
+      return;
+    }
+
+    try {
+      await playRefereeWhistle();
+      setSoundEnabled(true);
+      setSoundMessage('Silbato activado. Sonará al seleccionar un partido.');
+    } catch {
+      setSoundEnabled(false);
+      setSoundMessage('El audio no está disponible en este navegador. El radar sigue funcionando.');
+    }
   };
 
   return (
     <section aria-labelledby="match-radar-title" className="space-y-5">
+      <FootballAtmosphere
+        soundEnabled={soundEnabled}
+        onToggleSound={toggleSound}
+        soundMessage={soundMessage}
+      />
       <div className="flex flex-col gap-4">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
@@ -334,7 +366,7 @@ const MatchRadar = ({
                   className={`rounded-2xl border p-4 transition ${
                     isSelected
                       ? 'border-[#CCFF00]/50 bg-[#CCFF00]/[0.07]'
-                      : 'border-white/5 bg-white/[0.025] hover:border-white/15'
+                      : 'border-white/10 bg-[#0b1224] hover:border-white/25'
                   }`}
                 >
                   <button

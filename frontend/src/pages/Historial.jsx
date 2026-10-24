@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import MatchCard from '../components/MatchCard';
+import PastMatchList from '../components/Dashboard/PastMatchList';
 import { Loader2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
@@ -40,11 +40,11 @@ const Historial = ({ user, onLogout }) => {
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
       <Navbar user={user} onLogout={onLogout} />
 
-      <main className="pt-36 px-4 md:px-8 max-w-[1400px] mx-auto pb-20">
-        <div className="mb-16">
+      <main className="mx-auto max-w-[1100px] px-4 pb-20 pt-28 md:px-8 md:pt-36">
+        <div className="mb-8">
           <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Archivo de Pichangas</h2>
-          <h1 className="text-6xl md:text-8xl font-black italic uppercase tracking-tighter leading-[0.85]">
-            Mi <span className="opacity-10">Historial</span>
+          <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-[0.9] sm:text-6xl">
+            Mi <span className="text-slate-500">Historial</span>
           </h1>
         </div>
 
@@ -58,28 +58,14 @@ const Historial = ({ user, onLogout }) => {
         )}
 
         {partidosPasados.length === 0 ? (
-          <div className="border border-white/5 bg-white/5 p-20 text-center rounded-[48px]">
-            <p className="text-slate-500 font-black italic uppercase text-lg tracking-widest">
+          <div className="rounded-2xl border border-white/10 bg-[#0b1224] p-8 text-center sm:p-12">
+            <p className="font-black italic uppercase tracking-widest text-slate-300">
               No tienes partidos cancelados o finalizados.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {partidosPasados.map(p => {
-              const pId = p._id || p.id;
-              return (
-                <div 
-                  key={pId} 
-                  className="transition-all duration-500 opacity-60 hover:opacity-100 grayscale-[0.4] hover:grayscale-0"
-                >
-                  <MatchCard 
-                    partido={p} 
-                    user={user} 
-                    readOnly={true} // Evitamos que se puedan "cancelar" denuevo desde aquí
-                  />
-                </div>
-              );
-            })}
+          <div className="rounded-2xl border border-white/10 bg-[#080e1d] p-3 sm:p-5">
+            <PastMatchList matches={partidosPasados} />
           </div>
         )}
       </main>

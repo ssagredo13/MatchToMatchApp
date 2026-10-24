@@ -32,6 +32,8 @@ El dashboard prioriza un radar responsive con los partidos futuros y de hoy, bú
 
 El mapa usa las capas públicas oscuras de Esri (base y referencias), sin API key; la disponibilidad y el uso están sujetos a los términos vigentes de Esri. Se conserva la atribución requerida por la fuente. Es una alternativa para el MVP, no una garantía de disponibilidad ni de uso gratuito ilimitado; revisa los [términos de Esri](https://www.esri.com/en-us/legal/terms) antes de escalar el tráfico. Si el uso aumenta, migra a un proveedor con plan y límites adecuados. No precargues mosaicos ni automatices descargas.
 
+La sala de espera del radar incluye una ilustración vectorial original de un rondo. El silbato es un efecto sintetizado por Web Audio, sin muestras de videojuegos ni archivos de terceros; se mantiene apagado hasta que el usuario lo activa y puede desactivarse en cualquier momento. El historial usa filas compactas expandibles con teclado, toque o hover.
+
 ## 🤖 Co-Desarrollo con Inteligencia Artificial
 Este proyecto ha sido optimizado y co-desarrollado utilizando **Gemini 3 Flash**. La IA actuó como un colaborador estratégico en:
 * Refactorización crítica de componentes React.
