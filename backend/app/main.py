@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
 from app.config import settings
-from app.database import client, equipos_col, partidos_col, ping_db, usuarios_col
-from app.routes import auth, equipos, partidos, recintos
+from app.database import avisos_col, client, equipos_col, partidos_col, ping_db, usuarios_col
+from app.routes import auth, avisos, equipos, partidos, recintos
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ async def lifespan(app: FastAPI):
             unique=True,
             partialFilterExpression={"idempotencyKey": {"$type": "string"}},
         )
+        await avisos_col.create_index("expiresAt", expireAfterSeconds=0)
+        await avisos_col.create_index([("activo", 1), ("fecha", 1), ("hora", 1)])
     except PyMongoError:
         logger.exception(
             "Database initialization failed. Check Render's MONGO_URL, Atlas database "
@@ -49,11 +51,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Idempotency-Key"],
 )
 
 app.include_router(auth.router)
+app.include_router(avisos.router)
 app.include_router(equipos.router)
 app.include_router(partidos.router)
 app.include_router(recintos.router)

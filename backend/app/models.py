@@ -1,7 +1,7 @@
-from datetime import date, time
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 
 class EquipoCreate(BaseModel):
@@ -57,3 +57,62 @@ class MatchUpdate(BaseModel):
 
     action: Literal["join", "challenge"]
     rival_team_id: Optional[str] = None
+
+
+class AvisoCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tipo: Literal["RIVAL", "JUGADORES", "ARQUERO", "CANCHA"]
+    recinto: str = Field(min_length=2, max_length=160)
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    fecha: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    hora: str = Field(pattern=r"^\d{2}:\d{2}$")
+    timezoneOffsetMinutes: int = Field(ge=-840, le=840)
+    detalle: str = Field(default="", max_length=240)
+    cantidad: Optional[int] = Field(default=None, ge=1, le=30)
+    precio: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+
+    @field_validator("fecha")
+    @classmethod
+    def validate_fecha_aviso(cls, value: str) -> str:
+        date.fromisoformat(value)
+        return value
+
+    @field_validator("hora")
+    @classmethod
+    def validate_hora_aviso(cls, value: str) -> str:
+        time.fromisoformat(value)
+        return value
+
+    @field_validator("recinto", "detalle")
+    @classmethod
+    def trim_text_fields(cls, value: str, info: ValidationInfo) -> str:
+        trimmed = value.strip()
+        if info.field_name == "recinto" and not trimmed:
+            raise ValueError("recinto cannot be empty")
+        return trimmed
+
+    @model_validator(mode="after")
+    def validate_aviso(self):
+        if (self.lat is None) != (self.lng is None):
+            raise ValueError("lat and lng must be provided together")
+
+        if self.tipo in {"JUGADORES", "ARQUERO"} and self.cantidad is None:
+            raise ValueError("cantidad is required for player and goalkeeper notices")
+        if self.tipo != "CANCHA" and self.precio is not None:
+            raise ValueError("precio is only allowed for a court availability notice")
+        if self.tipo == "CANCHA" and self.cantidad is not None:
+            raise ValueError("cantidad is only allowed for player and goalkeeper notices")
+
+        scheduled_at = datetime.combine(
+            date.fromisoformat(self.fecha),
+            time.fromisoformat(self.hora),
+            tzinfo=timezone(timedelta(minutes=-self.timezoneOffsetMinutes)),
+        ).astimezone(timezone.utc)
+        now = datetime.now(timezone.utc)
+        if scheduled_at <= now:
+            raise ValueError("notice date and time must be in the future")
+        if scheduled_at - now > timedelta(days=30):
+            raise ValueError("notice date and time cannot be more than 30 days away")
+        return self

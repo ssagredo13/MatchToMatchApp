@@ -76,7 +76,9 @@ const Landing = ({ onLoginSuccess, onGoogleError, authError, isAuthenticating, g
               </>
             ) : (
               <p role="alert" className="max-w-xs text-sm font-bold text-amber-300">
-                El inicio de sesión no está configurado. Intenta más tarde.
+                {import.meta.env.DEV
+                  ? 'Configura VITE_GOOGLE_CLIENT_ID en frontend/.env y autoriza http://localhost:5173 en Google Cloud.'
+                  : 'El inicio de sesión no está configurado para este entorno. Intenta más tarde.'}
               </p>
             )}
             {authError && (

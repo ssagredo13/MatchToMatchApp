@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Building2,
   CalendarDays,
   Clock3,
   LocateFixed,
+  Megaphone,
   MapPin,
   Navigation,
   Search,
@@ -57,6 +59,13 @@ const formatMatchDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateStrin
   { weekday: 'short', day: 'numeric', month: 'short' },
 );
 
+const NOTICE_PRESENTATION = {
+  RIVAL: { label: 'Busco rival', color: '#fb923c' },
+  JUGADORES: { label: 'Busco jugadores', color: '#ccff00' },
+  ARQUERO: { label: 'Busco arquero', color: '#c084fc' },
+  CANCHA: { label: 'Cancha disponible', color: '#38bdf8' },
+};
+
 const MapCamera = ({ center, zoom }) => {
   const map = useMap();
 
@@ -71,6 +80,9 @@ const MapCamera = ({ center, zoom }) => {
 
 const MatchRadar = ({
   partidos,
+  avisos = [],
+  modo = 'ALL',
+  setModo = () => {},
   filtro,
   setFiltro,
   mapCenter,
@@ -94,6 +106,7 @@ const MatchRadar = ({
     const query = search.trim().toLocaleLowerCase('es-CL');
     const filteredMatches = partidos
       .filter((match) => {
+        if (modo === 'NEEDS' || modo === 'COURTS') return false;
         if (!query) return true;
         return [match.equipo, match.rival, match.recinto]
           .some((value) => value?.toLocaleLowerCase('es-CL').includes(query));
@@ -123,7 +136,55 @@ const MatchRadar = ({
     return filteredMatches.filter(
       (match) => match.distanceKm !== null && match.distanceKm <= Number(maxDistanceKm),
     );
-  }, [partidos, nearbyLocation, search, maxDistanceKm]);
+  }, [partidos, nearbyLocation, search, maxDistanceKm, modo]);
+
+  const items = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('es-CL');
+    const noticeItems = modo === 'MATCHES'
+      ? []
+      : avisos
+        .filter((notice) => (
+          modo === 'ALL'
+          || (modo === 'NEEDS' && notice.tipo !== 'CANCHA')
+          || (modo === 'COURTS' && notice.tipo === 'CANCHA')
+        ))
+        .filter((notice) => !query || [notice.recinto, notice.detalle, notice.creadorNombre]
+          .some((value) => value?.toLocaleLowerCase('es-CL').includes(query)))
+        .map((notice) => ({
+          ...notice,
+          kind: 'notice',
+          radarId: `aviso-${notice.id || notice._id}`,
+          distanceKm: isValidCoordinate(notice.lat) && isValidCoordinate(notice.lng)
+            ? getDistanceKm(
+              nearbyLocation || TALCA_CENTER,
+              Number(notice.lat),
+              Number(notice.lng),
+            )
+            : null,
+        }))
+        .filter((notice) => (
+          !nearbyLocation
+          || maxDistanceKm === 'all'
+          || (notice.distanceKm !== null && notice.distanceKm <= Number(maxDistanceKm))
+        ));
+
+    return [
+      ...matches.map((match) => ({
+        ...match,
+        kind: 'match',
+        radarId: match.id || match._id,
+      })),
+      ...noticeItems,
+    ].sort((first, second) => {
+      if (first.distanceKm !== null && second.distanceKm === null) return -1;
+      if (first.distanceKm === null && second.distanceKm !== null) return 1;
+      if (first.distanceKm !== null && second.distanceKm !== null
+        && first.distanceKm !== second.distanceKm) {
+        return first.distanceKm - second.distanceKm;
+      }
+      return `${first.fecha}T${first.hora}`.localeCompare(`${second.fecha}T${second.hora}`);
+    });
+  }, [avisos, matches, modo, nearbyLocation, maxDistanceKm, search]);
 
   const locateUser = () => {
     if (!navigator.geolocation) {
@@ -152,13 +213,15 @@ const MatchRadar = ({
     );
   };
 
-  const selectMatch = (match) => {
-    const matchId = match.id || match._id;
-    setActiveMatchId(matchId);
-    if (isValidCoordinate(match.lat) && isValidCoordinate(match.lng)) {
-      setMapCenter([Number(match.lat), Number(match.lng)]);
+  const selectItem = (item) => {
+    const itemId = item.kind === 'notice'
+      ? `aviso-${item.id || item._id}`
+      : item.id || item._id;
+    setActiveMatchId(itemId);
+    if (isValidCoordinate(item.lat) && isValidCoordinate(item.lng)) {
+      setMapCenter([Number(item.lat), Number(item.lng)]);
     }
-    if (soundEnabled) {
+    if (soundEnabled && item.kind === 'match') {
       playRefereeWhistle().catch(() => {
         setSoundEnabled(false);
         setSoundMessage('No se pudo reproducir audio. El radar sigue disponible sin sonido.');
@@ -184,7 +247,7 @@ const MatchRadar = ({
   };
 
   return (
-    <section aria-labelledby="match-radar-title" className="space-y-5">
+    <section id="match-radar" aria-labelledby="match-radar-title" className="scroll-mt-24 space-y-5">
       <FootballAtmosphere
         soundEnabled={soundEnabled}
         onToggleSound={toggleSound}
@@ -228,8 +291,8 @@ const MatchRadar = ({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Busca por equipo o recinto"
-              aria-label="Buscar partidos por equipo o recinto"
+              placeholder="Equipo, necesidad o recinto"
+              aria-label="Buscar partidos, avisos o recintos"
               className="h-12 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-[#CCFF00]/50"
             />
           </label>
@@ -247,8 +310,36 @@ const MatchRadar = ({
               <option value="10">Hasta 10 km</option>
               <option value="25">Hasta 25 km</option>
             </select>
-            <MatchFilters filtro={filtro} setFiltro={setFiltro} />
+            {modo !== 'NEEDS' && modo !== 'COURTS' && (
+              <MatchFilters filtro={filtro} setFiltro={setFiltro} />
+            )}
           </div>
+        </div>
+
+        <div
+          aria-label="Filtrar radar"
+          className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+        >
+          {[
+            { value: 'ALL', label: 'Todo el radar' },
+            { value: 'MATCHES', label: 'Partidos' },
+            { value: 'NEEDS', label: 'Jugadores y rivales' },
+            { value: 'COURTS', label: 'Canchas libres' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={modo === option.value}
+              onClick={() => setModo(option.value)}
+              className={`min-h-10 shrink-0 rounded-full border px-4 text-[11px] font-black uppercase tracking-wide transition ${
+                modo === option.value
+                  ? 'border-[#CCFF00]/60 bg-[#CCFF00]/10 text-[#CCFF00]'
+                  : 'border-white/10 bg-[#0b1224] text-slate-400 hover:border-white/25 hover:text-white'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
 
         {locationMessage && (
@@ -263,7 +354,7 @@ const MatchRadar = ({
             zoom={13}
             className="h-full w-full"
             scrollWheelZoom={false}
-            aria-label="Mapa de partidos disponibles"
+            aria-label="Mapa de partidos, necesidades y canchas disponibles"
           >
             <MapCamera center={mapCenter || TALCA_CENTER} zoom={13} />
             <TileLayer
@@ -288,17 +379,20 @@ const MatchRadar = ({
                 <Popup>Tu ubicación aproximada (solo visible en este dispositivo)</Popup>
               </CircleMarker>
             )}
-            {matches.map((match) => {
-              if (!isValidCoordinate(match.lat) || !isValidCoordinate(match.lng)) return null;
-              const matchId = match.id || match._id;
-              const isSelected = matchId === activeMatchId;
-              const isReady = match.estado === 'PARTIDO LISTO';
-              const color = isReady ? '#4ade80' : match.tipo === 'RIVAL' ? '#fb923c' : '#ccff00';
+            {items.map((item) => {
+              if (!isValidCoordinate(item.lat) || !isValidCoordinate(item.lng)) return null;
+              const isNotice = item.kind === 'notice';
+              const itemId = item.radarId;
+              const isSelected = itemId === activeMatchId;
+              const isReady = !isNotice && item.estado === 'PARTIDO LISTO';
+              const color = isNotice
+                ? NOTICE_PRESENTATION[item.tipo]?.color || '#ccff00'
+                : isReady ? '#4ade80' : item.tipo === 'RIVAL' ? '#fb923c' : '#ccff00';
 
               return (
                 <CircleMarker
-                  key={matchId}
-                  center={[Number(match.lat), Number(match.lng)]}
+                  key={itemId}
+                  center={[Number(item.lat), Number(item.lng)]}
                   radius={isSelected ? 14 : 10}
                   pathOptions={{
                     color: '#020617',
@@ -306,14 +400,18 @@ const MatchRadar = ({
                     fillOpacity: 0.95,
                     weight: isSelected ? 4 : 2,
                   }}
-                  eventHandlers={{ click: () => selectMatch(match) }}
+                  eventHandlers={{ click: () => selectItem(item) }}
                 >
                   <Popup>
-                    <strong>{match.equipo || 'Partido'}</strong>
+                    <strong>
+                      {isNotice
+                        ? NOTICE_PRESENTATION[item.tipo]?.label || 'Aviso'
+                        : item.equipo || 'Partido'}
+                    </strong>
                     <br />
-                    {match.recinto || 'Ubicación por confirmar'}
+                    {item.recinto || 'Ubicación por confirmar'}
                     <br />
-                    {match.fecha} · {match.hora}
+                    {item.fecha} · {item.hora}
                   </Popup>
                 </CircleMarker>
               );
@@ -332,6 +430,10 @@ const MatchRadar = ({
               <span className="mr-2 inline-block h-2 w-2 rounded-full bg-green-400" />
               Completo
             </span>
+            <span className="rounded-full border border-white/10 bg-[#020617]/90 px-3 py-2 text-[10px] font-bold text-white shadow">
+              <span className="mr-2 inline-block h-2 w-2 rounded-full bg-sky-400" />
+              Cancha
+            </span>
           </div>
         </div>
 
@@ -342,10 +444,14 @@ const MatchRadar = ({
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
             <div>
               <h3 className="font-black italic uppercase tracking-wide">
-                {nearbyLocation ? 'Cerca de ti' : 'Partidos en Talca'}
+                {modo === 'COURTS'
+                  ? 'Canchas disponibles'
+                  : modo === 'NEEDS'
+                  ? 'Jugadores y rivales'
+                  : nearbyLocation ? 'Cerca de ti' : 'Radar de Talca'}
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                {matches.length} {matches.length === 1 ? 'partido disponible' : 'partidos disponibles'}
+                {items.length} {items.length === 1 ? 'aviso disponible' : 'avisos disponibles'}
                 {' · '}{nearbyLocation ? 'desde tu ubicación' : 'desde Talca'}
               </p>
             </div>
@@ -353,100 +459,154 @@ const MatchRadar = ({
           </div>
 
           <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto p-3">
-            {matches.map((match) => {
-              const matchId = match.id || match._id;
-              const isSelected = matchId === activeMatchId;
-              const remaining = Math.max(0, Number(match.total || 0) - Number(match.jugadores || 0));
-              const canCancel = match.creadorEmail === userEmail || isAdmin;
-              const isFull = remaining === 0 || match.estado === 'PARTIDO LISTO';
+            {items.map((item) => {
+              const isNotice = item.kind === 'notice';
+              const itemId = item.radarId;
+              const isSelected = itemId === activeMatchId;
+              const remaining = isNotice
+                ? 0
+                : Math.max(0, Number(item.total || 0) - Number(item.jugadores || 0));
+              const canCancel = !isNotice && (item.creadorEmail === userEmail || isAdmin);
+              const isFull = !isNotice && (remaining === 0 || item.estado === 'PARTIDO LISTO');
 
               return (
                 <article
-                  key={matchId}
+                  key={itemId}
                   className={`rounded-2xl border p-4 transition ${
                     isSelected
                       ? 'border-[#CCFF00]/50 bg-[#CCFF00]/[0.07]'
                       : 'border-white/10 bg-[#0b1224] hover:border-white/25'
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => selectMatch(match)}
-                    className="w-full text-left"
-                    aria-pressed={isSelected}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-black italic uppercase">
-                          {match.equipo || 'Equipo'}
-                          {match.rival && <span className="text-[#CCFF00]"> vs {match.rival}</span>}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-slate-400">
-                          {match.recinto || 'Ubicación por confirmar'}
-                        </p>
+                  {isNotice ? (
+                    <button
+                      type="button"
+                      onClick={() => selectItem(item)}
+                      className="w-full text-left"
+                      aria-pressed={isSelected}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-300">
+                            {item.tipo === 'CANCHA' ? <Building2 size={13} /> : <Megaphone size={13} />}
+                            {NOTICE_PRESENTATION[item.tipo]?.label || 'Aviso'}
+                          </p>
+                          <h4 className="mt-1 truncate text-base font-black uppercase text-white">{item.recinto}</h4>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase text-slate-300">
+                          Aviso activo
+                        </span>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${
-                        match.estado === 'PARTIDO LISTO'
-                          ? 'bg-green-400/10 text-green-300'
-                          : match.tipo === 'RIVAL'
-                          ? 'bg-orange-400/10 text-orange-300'
-                          : 'bg-[#CCFF00]/10 text-[#CCFF00]'
-                      }`}>
-                        {match.estado === 'PARTIDO LISTO'
-                          ? 'Partido listo'
-                          : match.tipo === 'RIVAL' ? 'Versus' : 'Jugadores'}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-3 gap-2 text-[11px]">
-                      <span className="flex items-center gap-1.5 text-slate-300">
-                        <CalendarDays size={14} className="shrink-0 text-slate-500" />
-                        {formatMatchDate(match.fecha)}
-                      </span>
-                      <span className="flex items-center gap-1.5 text-slate-300">
-                        <Clock3 size={14} className="shrink-0 text-slate-500" />
-                        {match.hora}
-                      </span>
-                      <span className="flex items-center gap-1.5 text-slate-300">
-                        <MapPin size={14} className="shrink-0 text-slate-500" />
-                        {match.distanceKm === null ? 'Distancia —' : formatDistance(match.distanceKm)}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-[11px]">
-                      <span className="flex items-center gap-1.5 text-slate-400">
-                        <Users size={14} />
-                        {match.jugadores || 0}/{match.total || 0} jugadores
-                      </span>
-                      <span className="font-bold text-[#CCFF00]">
-                        {remaining > 0 ? `${remaining} cupos` : 'Completo'}
-                      </span>
-                    </div>
-                  </button>
-
-                  {isSelected && canCancel && (
-                    <button
-                      type="button"
-                      onClick={() => onCancelMatch(matchId)}
-                      className="mt-4 min-h-11 w-full rounded-xl border border-red-400/30 bg-red-500/10 px-4 text-xs font-black uppercase tracking-wide text-red-200 transition hover:bg-red-500/20"
-                    >
-                      Cancelar partido
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                        <span className="flex items-center gap-1.5 text-slate-300">
+                          <CalendarDays size={14} className="shrink-0 text-slate-500" />
+                          {formatMatchDate(item.fecha)}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-slate-300">
+                          <Clock3 size={14} className="shrink-0 text-slate-500" />
+                          {item.hora}
+                        </span>
+                      </div>
+                      {(item.cantidad || item.precio !== null && item.precio !== undefined) && (
+                        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-[#CCFF00]">
+                          {item.cantidad && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Users size={14} /> {item.cantidad} {item.tipo === 'ARQUERO' ? 'arqueros' : 'jugadores'}
+                            </span>
+                          )}
+                          {item.precio !== null && item.precio !== undefined && (
+                            <span>${Number(item.precio).toLocaleString('es-CL')} CLP</span>
+                          )}
+                        </p>
+                      )}
+                      {item.detalle && <p className="mt-3 line-clamp-2 text-xs text-slate-400">{item.detalle}</p>}
+                      <div className="mt-3 flex items-center justify-between gap-2 text-[10px] text-slate-500">
+                        <span>Publicado por {item.creadorNombre || 'usuario'}</span>
+                        <span>{item.distanceKm === null ? 'Distancia —' : formatDistance(item.distanceKm)}</span>
+                      </div>
                     </button>
-                  )}
-                  {isSelected && !canCancel && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectMatch(match)}
-                      disabled={isFull}
-                      className="mt-4 min-h-11 w-full rounded-xl bg-[#CCFF00] px-4 text-xs font-black uppercase tracking-wide text-black transition hover:bg-white disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400"
-                    >
-                      {isFull ? 'Partido completo' : 'Ver partido y unirme'}
-                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => selectItem(item)}
+                        className="w-full text-left"
+                        aria-pressed={isSelected}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-black italic uppercase">
+                              {item.equipo || 'Equipo'}
+                              {item.rival && <span className="text-[#CCFF00]"> vs {item.rival}</span>}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-slate-400">
+                              {item.recinto || 'Ubicación por confirmar'}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${
+                            item.estado === 'PARTIDO LISTO'
+                              ? 'bg-green-400/10 text-green-300'
+                              : item.tipo === 'RIVAL'
+                              ? 'bg-orange-400/10 text-orange-300'
+                              : 'bg-[#CCFF00]/10 text-[#CCFF00]'
+                          }`}>
+                            {item.estado === 'PARTIDO LISTO'
+                              ? 'Partido listo'
+                              : item.tipo === 'RIVAL' ? 'Versus' : 'Jugadores'}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-3 gap-2 text-[11px]">
+                          <span className="flex items-center gap-1.5 text-slate-300">
+                            <CalendarDays size={14} className="shrink-0 text-slate-500" />
+                            {formatMatchDate(item.fecha)}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-slate-300">
+                            <Clock3 size={14} className="shrink-0 text-slate-500" />
+                            {item.hora}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-slate-300">
+                            <MapPin size={14} className="shrink-0 text-slate-500" />
+                            {item.distanceKm === null ? 'Distancia —' : formatDistance(item.distanceKm)}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-[11px]">
+                          <span className="flex items-center gap-1.5 text-slate-400">
+                            <Users size={14} />
+                            {item.jugadores || 0}/{item.total || 0} jugadores
+                          </span>
+                          <span className="font-bold text-[#CCFF00]">
+                            {remaining > 0 ? `${remaining} cupos` : 'Completo'}
+                          </span>
+                        </div>
+                      </button>
+
+                      {isSelected && canCancel && (
+                        <button
+                          type="button"
+                          onClick={() => onCancelMatch(item.id || item._id)}
+                          className="mt-4 min-h-11 w-full rounded-xl border border-red-400/30 bg-red-500/10 px-4 text-xs font-black uppercase tracking-wide text-red-200 transition hover:bg-red-500/20"
+                        >
+                          Cancelar partido
+                        </button>
+                      )}
+                      {isSelected && !canCancel && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectMatch(item)}
+                          disabled={isFull}
+                          className="mt-4 min-h-11 w-full rounded-xl bg-[#CCFF00] px-4 text-xs font-black uppercase tracking-wide text-black transition hover:bg-white disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400"
+                        >
+                          {isFull ? 'Partido completo' : 'Ver partido y unirme'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </article>
               );
             })}
-            {matches.length === 0 && (
+            {items.length === 0 && (
               <div className="flex min-h-56 flex-col items-center justify-center px-6 text-center">
                 <MapPin size={28} className="mb-3 text-slate-600" />
                 <p className="font-bold text-white">No encontramos partidos con estos filtros</p>
@@ -459,6 +619,7 @@ const MatchRadar = ({
                     setSearch('');
                     setFiltro('TODOS');
                     setMaxDistanceKm('all');
+                    setModo('ALL');
                   }}
                   className="mt-4 text-xs font-black uppercase text-[#CCFF00] underline underline-offset-4"
                 >

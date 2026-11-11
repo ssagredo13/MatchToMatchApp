@@ -1,11 +1,12 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Building2, Loader2, Megaphone, Plus, Search, Users } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 // COMPONENTES MODULARIZADOS
 import MatchModals from '../components/MatchModals';
 import MatchRadar from '../components/Dashboard/MatchRadar';
 import PastMatchList from '../components/Dashboard/PastMatchList';
+import QuickNotices from '../components/Dashboard/QuickNotices';
 
 const Dashboard = ({ user }) => {
   // --- ESTADOS ---
@@ -22,6 +23,9 @@ const Dashboard = ({ user }) => {
   const [step, setStep] = useState(1);
   const [selectedPartido, setSelectedPartido] = useState(null);
   const [activeMatchId, setActiveMatchId] = useState(null);
+  const [avisos, setAvisos] = useState([]);
+  const [radarMode, setRadarMode] = useState('ALL');
+  const [noticeIntent, setNoticeIntent] = useState(null);
   const [mapCenter, setMapCenter] = useState([-35.4264, -71.6554]); 
   const [nuevoEquipo, setNuevoEquipo] = useState('');
   
@@ -32,6 +36,15 @@ const Dashboard = ({ user }) => {
   });
 
   const isAdmin = user?.role === 'admin';
+  const clearNoticeIntent = useCallback(() => setNoticeIntent(null), []);
+
+  const scrollToRadar = () => {
+    setRadarMode('ALL');
+    document.getElementById('match-radar')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
   const cargarPartidas = useCallback(async () => {
     try {
       const data = await apiFetch('/api/partidos');
@@ -228,14 +241,17 @@ const Dashboard = ({ user }) => {
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
       <main className="mx-auto max-w-[1600px] px-3 pb-12 pt-28 sm:px-5 md:px-8 md:pt-32">
-        <header className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <header className="mb-6 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
             <p className="mb-2 text-[10px] font-black italic uppercase tracking-[0.4em] text-[#CCFF00]">
-              Match to Match · Talca
+              Match to Match · Tu zona
             </p>
-            <h1 className="text-4xl font-black italic uppercase leading-none tracking-tight sm:text-5xl">
-              Partidos <span className="text-white/30">cerca</span>
+            <h1 className="max-w-3xl text-4xl font-black italic uppercase leading-[0.95] tracking-tight sm:text-5xl">
+              La pichanga que falta, <span className="text-[#CCFF00]">a un toque.</span>
             </h1>
+            <p className="mt-3 max-w-2xl text-sm text-slate-400 sm:text-base">
+              Encuentra partido, completa tu equipo o ayuda a llenar una cancha libre.
+            </p>
           </div>
           <button 
             onClick={() => {setModalType('PARTIDA'); setStep(1);}} 
@@ -246,6 +262,71 @@ const Dashboard = ({ user }) => {
             </div>
           </button>
         </header>
+
+        <section aria-label="Accesos rápidos" className="mb-7 grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border border-[#CCFF00]/20 bg-gradient-to-br from-[#CCFF00]/[0.09] to-[#0b1224] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#CCFF00]/10 text-[#CCFF00]">
+                <Users size={20} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-black uppercase text-white">Busco jugar</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  Mira partidos cercanos o publica que te faltan jugadores, arquero o rival.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={scrollToRadar}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#CCFF00] px-4 text-[11px] font-black uppercase tracking-wide text-black transition hover:bg-white"
+              >
+                <Search size={15} /> Explorar partidos
+              </button>
+              <button
+                type="button"
+                onClick={() => setNoticeIntent('JUGADORES')}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-[#020617]/60 px-4 text-[11px] font-black uppercase tracking-wide text-slate-200 transition hover:border-[#CCFF00]/40 hover:text-[#CCFF00]"
+              >
+                <Megaphone size={15} /> Publicar necesidad
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-400/[0.08] to-[#0b1224] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300">
+                <Building2 size={20} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="font-black uppercase text-white">Tengo un recinto</h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  Publica un horario disponible y haz que aparezca en el radar de jugadores.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setNoticeIntent('CANCHA')}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-300 px-4 text-[11px] font-black uppercase tracking-wide text-slate-950 transition hover:bg-white"
+              >
+                <Plus size={15} /> Publicar cancha libre
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRadarMode('COURTS');
+                  document.getElementById('match-radar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-[#020617]/60 px-4 text-[11px] font-black uppercase tracking-wide text-slate-200 transition hover:border-sky-300/40 hover:text-sky-200"
+              >
+                <Search size={15} /> Ver canchas libres
+              </button>
+            </div>
+          </div>
+        </section>
 
         {loadError && (
           <div role="alert" className="mb-6 rounded-xl border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-200">
@@ -261,6 +342,9 @@ const Dashboard = ({ user }) => {
         )}
 
         <MatchRadar
+          avisos={avisos}
+          modo={radarMode}
+          setModo={setRadarMode}
           partidos={partidasRadar}
           filtro={filtro}
           setFiltro={setFiltro}
@@ -275,6 +359,12 @@ const Dashboard = ({ user }) => {
             setSelectedPartido(match);
             setModalType('UNIRSE');
           }}
+        />
+
+        <QuickNotices
+          initialType={noticeIntent}
+          onInitialTypeHandled={clearNoticeIntent}
+          onNoticesChange={setAvisos}
         />
 
         <details className="mt-8 rounded-2xl border border-white/10 bg-[#080e1d] p-5">

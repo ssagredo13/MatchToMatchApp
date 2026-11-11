@@ -15,6 +15,15 @@
 La aplicación se encuentra operativa y optimizada en:
 * **🚀 URL Live:** [https://match-to-match-app.vercel.app/](https://match-to-match-app.vercel.app/)
 
+## 🔐 Autenticación en desarrollo local
+Que Google Auth funcione en producción no configura automáticamente el entorno local: Vercel y Vite local leen variables de entorno distintas. Para probar en local:
+
+1. En `frontend/.env`, configura `VITE_GOOGLE_CLIENT_ID` con el Client ID de tipo Web de Google OAuth usado por la aplicación. El Client ID no es una clave secreta; la seguridad depende de restringir sus orígenes autorizados y de verificar la credencial en el backend.
+2. En Google Cloud Console, agrega `http://localhost:5173` a **Authorized JavaScript origins** del mismo cliente OAuth. Abre la app con `http://localhost:5173` (no `127.0.0.1`, porque el origen debe coincidir exactamente).
+3. En `backend/.env`, configura el mismo `GOOGLE_CLIENT_ID` y un `AUTH_SECRET_KEY` de al menos 32 caracteres. No copies el secreto al frontend ni lo compartas en el repositorio.
+4. Inicia el backend en `localhost:8000`; el frontend local ya apunta a esa dirección mediante `VITE_API_URL`. El backend también debe poder conectarse a MongoDB.
+5. Reinicia Vite después de cambiar `frontend/.env`, porque Vite carga esas variables al arrancar.
+
 ## 🏗️ Arquitectura del Sistema
 El ecosistema **Match to Match** utiliza una arquitectura de nube híbrida de alto rendimiento:
 * **Frontend (UI):** Desplegado en **Vercel** (React 18 + Vite).
@@ -35,10 +44,12 @@ El mapa usa las capas públicas oscuras de Esri (base y referencias), sin API ke
 La sala de espera del radar incluye una ilustración vectorial original de un rondo. El silbato es un efecto sintetizado por Web Audio, sin muestras de videojuegos ni archivos de terceros; se mantiene apagado hasta que el usuario lo activa y puede desactivarse en cualquier momento. El historial usa filas compactas expandibles con teclado, toque o hover.
 
 ## 🗺️ Roadmap producto: necesidades urgentes de cancha
-El siguiente flujo prioritario debe reemplazar los avisos dispersos de WhatsApp por publicaciones breves, filtrables por zona, fecha y hora:
+La primera versión de avisos rápidos está disponible en el Dashboard y permite publicar `Busco rival`, `Necesito jugadores`, `Busco arquero` y `Cancha disponible`. Los avisos se guardan en la colección MongoDB `avisos`, requieren sesión, vencen a la hora indicada (máximo 30 días) y su autor puede retirarlos. Incluyen ubicación, fecha/hora, detalle opcional, cupos o precio según el tipo. Partidos y avisos geolocalizados aparecen juntos en el radar, con filtros para partidos, necesidades y canchas libres, búsqueda y distancia opcional. Los avisos son una entidad separada de los partidos; por ahora no exponen correos ni implementan respuestas/contacto.
 
-1. **Publicar necesidad en segundos:** `Busco rival`, `Necesito jugadores`, `Busco arquero` y `Cancha disponible`. Cada opción abre un formulario corto con recinto/ubicación, hora límite, cupos o disponibilidad, contacto y vencimiento automático. La publicación de cancha requiere un modelo y permisos de recinto propios; no debe simularse como una pichanga.
-2. **Radar y ficha accionable:** ordenar por distancia/urgencia, mostrar hora, recinto, cupos/precio si aplica y permitir responder o contactar al organizador. Incorporar controles de spam, bloqueo y reporte.
+Próximas fases:
+
+1. **Respuesta a avisos:** mecanismo para responder/contactar sin exponer datos personales; sumar filtros horarios avanzados y priorización por urgencia.
+2. **Moderación y prevención de abuso:** verificación de recintos, reporte/bloqueo, límites de publicación y herramientas administrativas.
 3. **Notificaciones dentro de la app:** centro de actividad y preferencias por tipo de necesidad; deduplicación, vencimiento y estado leído.
 4. **Push web/PWA:** Web Push con service worker y claves VAPID, solo tras permiso explícito. Debe existir una alternativa in-app si el navegador no soporta push.
 5. **Correo:** avisos transaccionales y resumen configurable con proveedor SMTP/API, bajas y registro de consentimiento.
