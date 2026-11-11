@@ -23,6 +23,7 @@ import FootballAtmosphere from './FootballAtmosphere';
 import { playRefereeWhistle } from '../../lib/footballSound';
 
 const TALCA_CENTER = [-35.4264, -71.6554];
+const RECOMMENDED_RADIUS_KM = 25;
 
 const isValidCoordinate = (value) => (
   value !== null
@@ -199,7 +200,9 @@ const MatchRadar = ({
         const position = [coords.latitude, coords.longitude];
         setNearbyLocation(position);
         setMapCenter(position);
-        setLocationMessage('Mostrando primero los partidos más cercanos a ti.');
+        setLocationMessage(
+          'Ordenamos primero los partidos cercanos. Puedes unirte aunque estés fuera del radio sugerido; tu ubicación queda solo en este dispositivo.',
+        );
         setLocating(false);
       },
       (error) => {
@@ -266,7 +269,9 @@ const MatchRadar = ({
               Encuentra tu <span className="text-[#CCFF00]">partido</span>
             </h2>
             <p className="mt-2 text-sm text-slate-400">
-              Ubicación, hora y cupos en una sola vista. Distancia desde {nearbyLocation ? 'ti' : 'Talca'}.
+              Ubicación, hora y cupos en una sola vista. {nearbyLocation
+                ? 'Tu ubicación solo ordena por cercanía; no impide unirte.'
+                : 'Distancias referenciales desde Talca.'}
             </p>
           </div>
           <button
@@ -305,7 +310,7 @@ const MatchRadar = ({
               disabled={!nearbyLocation}
               className="h-11 rounded-full border border-white/10 bg-[#0b1224] px-4 text-xs font-bold text-slate-300 outline-none focus:border-[#CCFF00]/50 disabled:cursor-not-allowed disabled:opacity-45"
             >
-              <option value="all">Cualquier distancia</option>
+              <option value="all">Cualquier distancia · recomendado</option>
               <option value="5">Hasta 5 km</option>
               <option value="10">Hasta 10 km</option>
               <option value="25">Hasta 25 km</option>
@@ -580,6 +585,13 @@ const MatchRadar = ({
                             {remaining > 0 ? `${remaining} cupos` : 'Completo'}
                           </span>
                         </div>
+                        {nearbyLocation && item.distanceKm !== null
+                          && item.distanceKm > RECOMMENDED_RADIUS_KM && !isFull && (
+                            <p className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-[11px] leading-relaxed text-amber-100">
+                              Está a {formatDistance(item.distanceKm)} de ti, fuera del radio sugerido de {RECOMMENDED_RADIUS_KM} km.
+                              Puedes continuar si te acomoda el traslado.
+                            </p>
+                          )}
                       </button>
 
                       {isSelected && canCancel && (
@@ -598,7 +610,12 @@ const MatchRadar = ({
                           disabled={isFull}
                           className="mt-4 min-h-11 w-full rounded-xl bg-[#CCFF00] px-4 text-xs font-black uppercase tracking-wide text-black transition hover:bg-white disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400"
                         >
-                          {isFull ? 'Partido completo' : 'Ver partido y unirme'}
+                          {isFull
+                            ? 'Partido completo'
+                            : nearbyLocation && item.distanceKm !== null
+                              && item.distanceKm > RECOMMENDED_RADIUS_KM
+                              ? 'Ver y unirme igual'
+                              : 'Ver partido y unirme'}
                         </button>
                       )}
                     </>
