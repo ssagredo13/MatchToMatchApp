@@ -1,111 +1,142 @@
-// src/pages/Landing.jsx
 import React from 'react';
+import { ArrowDownRight, ArrowUpRight, MapPin, Target } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
-import { Target } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-const Landing = ({ onLoginSuccess, onGoogleError, authError, isAuthenticating, googleClientIdConfigured }) => (
-  <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden">
-    
-    {/* FONDO DE IMPACTO: Collage / Imagen de Cancha con Overlay */}
-    <div className="absolute inset-0 z-0">
-      <img 
-        src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2000&auto=format&fit=crop" 
-        alt="Cancha de fútbol" 
-        className="w-full h-full object-cover opacity-40 scale-105"
+const Landing = ({
+  onLoginSuccess,
+  onGoogleError,
+  authError,
+  isAuthenticating,
+  googleClientIdConfigured,
+}) => (
+  <div className="relative isolate min-h-screen overflow-hidden bg-[#050806] text-white">
+    <div aria-hidden="true" className="absolute inset-0 -z-10">
+      <img
+        src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2000&auto=format&fit=crop"
+        alt=""
+        className="h-full min-h-screen w-full object-cover object-[62%_center] opacity-45"
       />
-      {/* Gradiente para asegurar legibilidad */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#020617]/90 via-[#020617]/70 to-[#020617]"></div>
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,4,0.98)_0%,rgba(2,6,4,0.86)_42%,rgba(2,6,4,0.38)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(0deg,#050806_0%,transparent_38%,rgba(2,6,4,0.18)_100%)]" />
+      <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:linear-gradient(90deg,black,transparent_78%)]" />
     </div>
 
-    {/* BLUR DECORATIVO (EL GUIÑO) */}
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-[#CCFF00]/10 blur-[80px] md:blur-[120px] rounded-full pointer-events-none"></div>
-
-    <div className="relative z-10 text-center w-full max-w-5xl">
-      
-      {/* GUIÑO A OTROS DEPORTES (BADGE) */}
-      <div className="flex justify-center gap-6 mb-8 opacity-60">
-        <div className="flex items-center gap-2 text-[10px] font-black italic text-white/50 tracking-[0.3em] uppercase">
-          <Target size={14} className="text-[#CCFF00]" /> Fútbol
+    <main className="mx-auto flex min-h-screen max-w-[1600px] flex-col px-5 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-7 lg:px-14">
+      <header className="flex items-center justify-between border-b border-white/15 pb-4">
+        <Link to="/" aria-label="Match to Match, inicio" className="group flex items-center gap-3">
+          <span className="flex h-10 w-10 -skew-x-12 items-center justify-center bg-[#CCFF00] text-xl font-black italic text-black transition-transform group-hover:scale-105">
+            <span className="skew-x-12">M</span>
+          </span>
+          <span className="text-sm font-black uppercase tracking-[0.16em] sm:text-base">
+            Match to <span className="text-[#CCFF00]">Match</span>
+          </span>
+        </Link>
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/65 sm:text-xs">
+          <MapPin size={14} className="text-[#CCFF00]" />
+          Talca, Chile
         </div>
-        <div className="flex items-center gap-2 text-[10px] font-black italic text-white/30 tracking-[0.3em] uppercase">
-           Padel <span className="text-[8px] bg-white/10 px-1 rounded text-[#CCFF00]">SOON</span>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] font-black italic text-white/30 tracking-[0.3em] uppercase">
-           Tenis <span className="text-[8px] bg-white/10 px-1 rounded text-[#CCFF00]">SOON</span>
-        </div>
-      </div>
+      </header>
 
-      <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-[120px] font-black text-white italic uppercase mb-2 tracking-tighter leading-[0.85]">
-        MATCH TO <br className="block md:hidden" /> 
-        <span className="text-[#CCFF00]">MATCH</span>
-      </h1>
+      <section className="grid flex-1 items-center gap-12 py-14 md:py-20 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] lg:gap-16 lg:py-16">
+        <div className="max-w-4xl">
+          <p className="mb-5 flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.32em] text-[#CCFF00] sm:text-xs">
+            <span className="h-px w-8 bg-[#CCFF00]" />
+            La ciudad juega aquí
+          </p>
 
-      <div className="h-1.5 w-24 md:w-40 bg-[#CCFF00] mx-auto mb-8 md:mb-12 skew-x-[-15deg] shadow-[0_0_20px_rgba(204,255,0,0.5)]"></div>
+          <h1 className="text-[clamp(3.7rem,11vw,8.5rem)] font-black italic uppercase leading-[0.76] tracking-[-0.075em]">
+            Match
+            <br />
+            <span className="whitespace-nowrap text-[#CCFF00]">to Match</span>
+          </h1>
 
-      <p className="text-slate-300 mb-12 md:mb-16 text-lg md:text-3xl font-medium max-w-sm md:max-w-2xl mx-auto leading-tight px-4 italic">
-        La red deportiva más grande de <span className="text-white font-bold border-b-2 border-[#CCFF00]">Talca</span>. 
-        Encuentra tu próximo 6 vs 6 en segundos.
-      </p>
-
-      <div className="flex flex-col items-center gap-4">
-        {/* CONTENEDOR LOGIN ESTILO TECH */}
-        <div className="bg-white/5 backdrop-blur-xl p-10 border border-white/10 rounded-[40px] shadow-[0_0_80px_rgba(0,0,0,0.5)] skew-x-[-2deg] relative group overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#CCFF00] scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-          
-          <div className="skew-x-[2deg] flex flex-col items-center">
-            <p className="text-white font-black italic mb-8 uppercase tracking-[0.2em] text-sm">
-              Acceso <span className="text-[#CCFF00]">Pro Player</span>
+          <div className="mt-8 max-w-2xl border-l-2 border-[#CCFF00] pl-4 sm:mt-10 sm:pl-6">
+            <p className="text-lg font-semibold leading-snug text-white sm:text-2xl">
+              La próxima pichanga no se organiza sola.
             </p>
-            
-            {googleClientIdConfigured ? (
-              <>
-                {isAuthenticating && (
-                  <p role="status" className="mt-4 text-xs font-bold text-[#CCFF00]">
-                    Verificando tu cuenta...
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
+              Encuentra partidos cerca, completa tu equipo o publica una cancha disponible en Talca.
+            </p>
+          </div>
+
+          <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[10px] font-black uppercase tracking-[0.12em] text-white/75 sm:mt-9 sm:gap-x-7 sm:text-xs">
+            <span className="inline-flex items-center gap-2"><Target size={14} className="text-[#CCFF00]" /> Partidos</span>
+            <span className="inline-flex items-center gap-2"><Target size={14} className="text-[#CCFF00]" /> Jugadores</span>
+            <span className="inline-flex items-center gap-2"><Target size={14} className="text-[#CCFF00]" /> Canchas</span>
+          </div>
+        </div>
+
+        <aside className="relative w-full max-w-md justify-self-start lg:justify-self-end">
+          <div className="absolute -left-3 -top-3 h-12 w-12 border-l-2 border-t-2 border-[#CCFF00] sm:-left-4 sm:-top-4 sm:h-16 sm:w-16" />
+          <div className="border border-white/20 bg-[#080d0a]/85 p-6 shadow-2xl backdrop-blur-md sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#CCFF00]">Acceso a la comunidad</p>
+                <h2 className="mt-3 text-2xl font-black italic uppercase leading-none sm:text-3xl">
+                  Entra a la cancha.
+                </h2>
+              </div>
+              <ArrowDownRight aria-hidden="true" size={23} className="shrink-0 text-[#CCFF00]" />
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-white/60">
+              Entra como jugador o recinto: encuentra partidos, completa tu equipo o publica una cancha disponible.
+            </p>
+
+            <div className="mt-7 flex min-h-12 items-center">
+              {googleClientIdConfigured ? (
+                isAuthenticating ? (
+                  <p role="status" className="text-xs font-bold text-[#CCFF00]">
+                    Verificando tu cuenta…
                   </p>
-                )}
-                {!isAuthenticating && (
+                ) : (
                   <GoogleLogin
                     onSuccess={onLoginSuccess}
                     onError={onGoogleError}
                     useOneTap
-                    theme="filled_blue"
-                    shape="pill"
+                    theme="outline"
+                    shape="rectangular"
+                    text="continue_with"
                   />
-                )}
-              </>
-            ) : (
-              <p role="alert" className="max-w-xs text-sm font-bold text-amber-300">
-                {import.meta.env.DEV
-                  ? 'Configura VITE_GOOGLE_CLIENT_ID en frontend/.env y autoriza http://localhost:5173 en Google Cloud.'
-                  : 'El inicio de sesión no está configurado para este entorno. Intenta más tarde.'}
-              </p>
-            )}
+                )
+              ) : (
+                <p role="alert" className="max-w-sm border-l-2 border-amber-300 pl-3 text-xs leading-relaxed text-amber-200">
+                  {import.meta.env.DEV
+                    ? 'Configura VITE_GOOGLE_CLIENT_ID en frontend/.env y autoriza http://localhost:5173 en Google Cloud.'
+                    : 'El inicio de sesión no está configurado para este entorno. Intenta más tarde.'}
+                </p>
+              )}
+            </div>
+
             {authError && (
-              <p role="alert" className="mt-4 max-w-xs text-sm font-bold text-red-300">
+              <p role="alert" className="mt-4 border-l-2 border-red-400 pl-3 text-sm text-red-200">
                 {authError}
               </p>
             )}
+            <p className="mt-6 border-t border-white/10 pt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">
+              Acceso seguro con Google
+            </p>
           </div>
-        </div>
+          <div className="absolute -bottom-3 -right-3 h-12 w-12 border-b-2 border-r-2 border-[#CCFF00] sm:-bottom-4 sm:-right-4 sm:h-16 sm:w-16" />
+        </aside>
+      </section>
 
-        {/* MÉTRICAS RÁPIDAS */}
-        <div className="mt-12 flex gap-10 text-white/40 font-black italic text-[10px] uppercase tracking-widest">
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-white text-lg font-black tracking-normal">+500</span>
-            Jugadores
+      <footer className="grid grid-cols-3 border-t border-white/20 pt-4 sm:pt-5">
+        {[
+          { number: '01', label: 'Encuentra partido' },
+          { number: '02', label: 'Completa tu equipo' },
+          { number: '03', label: 'Activa tu cancha' },
+        ].map((item) => (
+          <div key={item.number} className="flex flex-col gap-1 border-r border-white/15 px-2 last:border-r-0 sm:flex-row sm:items-center sm:gap-3 sm:px-5">
+            <span className="text-[9px] font-black tracking-widest text-[#CCFF00] sm:text-[10px]">{item.number}</span>
+            <span className="text-[8px] font-black uppercase leading-tight tracking-[0.08em] text-white/65 sm:text-[10px] sm:tracking-[0.14em]">
+              {item.label}
+            </span>
+            <ArrowUpRight aria-hidden="true" size={13} className="hidden text-white/40 sm:ml-auto sm:block" />
           </div>
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-white text-lg font-black tracking-normal">+20</span>
-            Canchas
-          </div>
-          <div className="flex flex-col items-center gap-1">
-             <span className="text-white text-lg font-black tracking-normal">24/7</span>
-             Activo
-          </div>
-        </div>
-      </div>
-    </div>
+        ))}
+      </footer>
+    </main>
   </div>
 );
 
