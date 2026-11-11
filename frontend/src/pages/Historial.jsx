@@ -1,10 +1,9 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import Navbar from '../components/Navbar';
 import PastMatchList from '../components/Dashboard/PastMatchList';
 import { Loader2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
-const Historial = ({ user, onLogout }) => {
+const Historial = ({ user }) => {
   const [partidosPasados, setPartidosPasados] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,8 +37,6 @@ const Historial = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
-      <Navbar user={user} onLogout={onLogout} />
-
       <main className="mx-auto max-w-[1100px] px-4 pb-20 pt-28 md:px-8 md:pt-36">
         <div className="mb-8">
           <h2 className="text-[11px] font-black italic text-[#CCFF00] uppercase tracking-[0.5em] ml-1">Archivo de Pichangas</h2>

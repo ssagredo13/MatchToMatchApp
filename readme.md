@@ -34,6 +34,18 @@ El mapa usa las capas públicas oscuras de Esri (base y referencias), sin API ke
 
 La sala de espera del radar incluye una ilustración vectorial original de un rondo. El silbato es un efecto sintetizado por Web Audio, sin muestras de videojuegos ni archivos de terceros; se mantiene apagado hasta que el usuario lo activa y puede desactivarse en cualquier momento. El historial usa filas compactas expandibles con teclado, toque o hover.
 
+## 🗺️ Roadmap producto: necesidades urgentes de cancha
+El siguiente flujo prioritario debe reemplazar los avisos dispersos de WhatsApp por publicaciones breves, filtrables por zona, fecha y hora:
+
+1. **Publicar necesidad en segundos:** `Busco rival`, `Necesito jugadores`, `Busco arquero` y `Cancha disponible`. Cada opción abre un formulario corto con recinto/ubicación, hora límite, cupos o disponibilidad, contacto y vencimiento automático. La publicación de cancha requiere un modelo y permisos de recinto propios; no debe simularse como una pichanga.
+2. **Radar y ficha accionable:** ordenar por distancia/urgencia, mostrar hora, recinto, cupos/precio si aplica y permitir responder o contactar al organizador. Incorporar controles de spam, bloqueo y reporte.
+3. **Notificaciones dentro de la app:** centro de actividad y preferencias por tipo de necesidad; deduplicación, vencimiento y estado leído.
+4. **Push web/PWA:** Web Push con service worker y claves VAPID, solo tras permiso explícito. Debe existir una alternativa in-app si el navegador no soporta push.
+5. **Correo:** avisos transaccionales y resumen configurable con proveedor SMTP/API, bajas y registro de consentimiento.
+6. **WhatsApp:** integración solo mediante WhatsApp Business Platform/proveedor autorizado, opt-in verificable, plantillas aprobadas y control de costos/límites. No automatizar cuentas personales, grupos ni WhatsApp Web.
+
+Antes de habilitar canales externos se definirán responsable del recinto, verificación de publicaciones, consentimiento por canal, retención de datos, ventanas silenciosas, frecuencia máxima y tarifas del proveedor. Prioridad de MVP: necesidades rápidas + radar + notificación in-app; luego PWA push/email; WhatsApp queda condicionado a consentimiento, aprobación y presupuesto comercial.
+
 ## 🤖 Co-Desarrollo con Inteligencia Artificial
 Este proyecto ha sido optimizado y co-desarrollado utilizando **Gemini 3 Flash**. La IA actuó como un colaborador estratégico en:
 * Refactorización crítica de componentes React.

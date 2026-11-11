@@ -58,10 +58,10 @@ const MyTeams = ({ user }) => {
   return (
     <div className="min-h-screen bg-[#020617] text-white">
       <main className="pt-36 px-4 max-w-[1200px] mx-auto pb-20">
-        <div className="flex justify-between items-end mb-12">
+        <div className="mb-12 flex flex-col items-start gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-[#CCFF00] font-black italic uppercase tracking-widest text-xs mb-2">Gestión de Clubes</h2>
-            <h1 className="text-6xl font-black italic uppercase tracking-tighter">
+            <h1 className="text-4xl font-black italic uppercase tracking-tighter sm:text-6xl">
               Mis <span className="opacity-20">Equipos</span>
             </h1>
           </div>
@@ -71,7 +71,7 @@ const MyTeams = ({ user }) => {
               setStep(2); 
               setModalType('PARTIDA'); 
             }}
-            className="bg-[#CCFF00] text-black font-black italic uppercase px-8 py-4 flex items-center gap-2 hover:bg-white transition-colors rounded-xl shadow-lg active:scale-95"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#CCFF00] px-6 py-4 font-black italic uppercase text-black shadow-lg transition-colors hover:bg-white active:scale-95 sm:w-auto sm:px-8"
           >
             <Plus size={20} strokeWidth={3} /> Crear Club
           </button>
@@ -86,7 +86,7 @@ const MyTeams = ({ user }) => {
         )}
 
         {equipos.length === 0 ? (
-          <div className="border border-white/5 bg-white/5 rounded-[32px] p-20 text-center">
+          <div className="rounded-[32px] border border-white/5 bg-white/5 p-8 text-center sm:p-20">
             <Users className="mx-auto mb-4 opacity-20" size={64} />
             <p className="text-slate-500 font-bold uppercase italic">No tienes equipos creados.</p>
           </div>

@@ -240,7 +240,7 @@ const MatchRadar = ({
               value={maxDistanceKm}
               onChange={(event) => setMaxDistanceKm(event.target.value)}
               disabled={!nearbyLocation}
-              className="h-10 rounded-full border border-white/10 bg-[#0b1224] px-4 text-xs font-bold text-slate-300 outline-none focus:border-[#CCFF00]/50 disabled:cursor-not-allowed disabled:opacity-45"
+              className="h-11 rounded-full border border-white/10 bg-[#0b1224] px-4 text-xs font-bold text-slate-300 outline-none focus:border-[#CCFF00]/50 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <option value="all">Cualquier distancia</option>
               <option value="5">Hasta 5 km</option>

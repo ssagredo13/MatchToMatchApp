@@ -3,12 +3,11 @@ import { Plus, Loader2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 // COMPONENTES MODULARIZADOS
-import Navbar from '../components/Navbar';
 import MatchModals from '../components/MatchModals';
 import MatchRadar from '../components/Dashboard/MatchRadar';
 import PastMatchList from '../components/Dashboard/PastMatchList';
 
-const Dashboard = ({ user, onLogout }) => {
+const Dashboard = ({ user }) => {
   // --- ESTADOS ---
   const [partidos, setPartidos] = useState([]);
   const [recintosOficiales, setRecintosOficiales] = useState([]);
@@ -228,8 +227,6 @@ const Dashboard = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-[#ccff00] overflow-x-hidden">
-      <Navbar user={user} onLogout={onLogout} />
-
       <main className="mx-auto max-w-[1600px] px-3 pb-12 pt-28 sm:px-5 md:px-8 md:pt-32">
         <header className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>

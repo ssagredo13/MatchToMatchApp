@@ -140,7 +140,7 @@ function App() {
           
           <Route 
             path="/dashboard" 
-            element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
+            element={user ? <Dashboard user={user} /> : <Navigate to="/" />}
           />
 
           <Route 
@@ -150,7 +150,7 @@ function App() {
 
           <Route 
             path="/historial" 
-            element={user ? <Historial user={user} onLogout={handleLogout} /> : <Navigate to="/" />} 
+            element={user ? <Historial user={user} /> : <Navigate to="/" />}
           />
 
           <Route path="*" element={<Navigate to="/" />} />
