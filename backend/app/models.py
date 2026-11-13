@@ -14,11 +14,12 @@ class PartidoCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     equipoId: str = Field(min_length=1, max_length=24)
-    recinto: str = Field(min_length=1, max_length=160)
+    recinto: str = Field(min_length=2, max_length=160)
     lat: float = Field(ge=-90, le=90)
     lng: float = Field(ge=-180, le=180)
     hora: str = Field(pattern=r"^\d{2}:\d{2}$")
     fecha: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    timezoneOffsetMinutes: int = Field(default=0, ge=-840, le=840)
     tipo: Literal["JUGADORES", "RIVAL"]
     jugadores: int = Field(ge=1)
     total: int = Field(ge=2, le=50)
@@ -36,10 +37,25 @@ class PartidoCreate(BaseModel):
         time.fromisoformat(value)
         return value
 
+    @field_validator("recinto")
+    @classmethod
+    def trim_recinto(cls, value: str) -> str:
+        trimmed = value.strip()
+        if len(trimmed) < 2:
+            raise ValueError("recinto must contain at least two characters")
+        return trimmed
+
     @model_validator(mode="after")
     def validate_player_count(self):
         if self.jugadores > self.total:
             raise ValueError("jugadores cannot exceed total")
+        scheduled_at = datetime.combine(
+            date.fromisoformat(self.fecha),
+            time.fromisoformat(self.hora),
+            tzinfo=timezone(timedelta(minutes=-self.timezoneOffsetMinutes)),
+        ).astimezone(timezone.utc)
+        if scheduled_at <= datetime.now(timezone.utc):
+            raise ValueError("match date and time must be in the future")
         return self
 
 class RecintoModel(BaseModel):

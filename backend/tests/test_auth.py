@@ -1,4 +1,7 @@
 import hashlib
+import json
+import logging
+from datetime import datetime, timedelta
 
 import jwt
 from bson import ObjectId
@@ -12,6 +15,7 @@ from app.routes import auth
 from app.routes import partidos as partidos_route
 from app.config import Settings
 from app.security import create_access_token, get_current_user
+from app.observability import JsonLogFormatter, request_id_context
 from fastapi.security import HTTPAuthorizationCredentials
 
 
@@ -33,7 +37,7 @@ class GoogleLoginTests(IsolatedAsyncioTestCase):
             "rol": "jugador",
         }
         collection = SimpleNamespace(
-            update_one=AsyncMock(),
+            update_one=AsyncMock(return_value=SimpleNamespace(upserted_id=None)),
             find_one=AsyncMock(return_value=persisted_user),
         )
         auth_settings = SimpleNamespace(
@@ -114,6 +118,31 @@ class GoogleLoginTests(IsolatedAsyncioTestCase):
         collection.find_one.assert_awaited_once_with({"email": user["email"]})
 
 
+class StructuredLoggingTests(IsolatedAsyncioTestCase):
+    async def test_json_logs_include_request_id_without_serializing_sensitive_extras(self):
+        record = logging.LogRecord(
+            name="app.routes.auth",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="auth.login.database_error",
+            args=(),
+            exc_info=None,
+        )
+        record.event = "auth.login.database_error"
+        record.email = "private@example.com"
+        request_token = request_id_context.set("request-123")
+        try:
+            serialized = JsonLogFormatter().format(record)
+        finally:
+            request_id_context.reset(request_token)
+
+        entry = json.loads(serialized)
+        self.assertEqual(entry["request_id"], "request-123")
+        self.assertEqual(entry["event"], "auth.login.database_error")
+        self.assertNotIn("email", entry)
+
+
 class CorsConfigurationTests(IsolatedAsyncioTestCase):
     async def test_production_frontend_is_allowed_with_local_origins(self):
         settings = Settings(
@@ -186,13 +215,15 @@ class CorsConfigurationTests(IsolatedAsyncioTestCase):
 
 class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
     def _make_match(self):
+        scheduled = datetime.now().astimezone() + timedelta(days=2)
         return partidos_route.PartidoCreate(
             equipoId=str(ObjectId()),
             recinto="Cancha de prueba",
             lat=-35.4,
             lng=-71.6,
-            hora="20:00",
-            fecha="2026-10-30",
+            hora=scheduled.strftime("%H:%M"),
+            fecha=scheduled.strftime("%Y-%m-%d"),
+            timezoneOffsetMinutes=-int(scheduled.utcoffset().total_seconds() / 60),
             tipo="JUGADORES",
             jugadores=2,
             total=12,
@@ -273,8 +304,41 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
         self.assertEqual(result["creadorEmail"], owner["email"])
         self.assertEqual(result["estado"], "BUSCANDO JUGADORES")
         self.assertEqual(saved_data["idempotencyKey"], "new-request")
+        self.assertTrue(saved_data["scheduledAt"].tzinfo)
         self.assertNotIn("idempotencyKey", result)
         self.assertEqual(saved_data["jugadoresInscritos"], [owner["email"]])
+
+    async def test_past_match_schedule_is_rejected_by_backend_validation(self):
+        scheduled = datetime.now().astimezone() - timedelta(days=1)
+        with self.assertRaises(ValueError):
+            partidos_route.PartidoCreate(
+                equipoId=str(ObjectId()),
+                recinto="Cancha de prueba",
+                lat=-35.4,
+                lng=-71.6,
+                hora=scheduled.strftime("%H:%M"),
+                fecha=scheduled.strftime("%Y-%m-%d"),
+                timezoneOffsetMinutes=-int(scheduled.utcoffset().total_seconds() / 60),
+                tipo="JUGADORES",
+                jugadores=1,
+                total=12,
+                arqueroFaltante=False,
+            )
+
+    async def test_invalid_calendar_date_is_rejected_by_backend_validation(self):
+        with self.assertRaises(ValueError):
+            partidos_route.PartidoCreate(
+                equipoId=str(ObjectId()),
+                recinto="Cancha de prueba",
+                lat=-35.4,
+                lng=-71.6,
+                hora="20:00",
+                fecha="2026-02-30",
+                tipo="JUGADORES",
+                jugadores=1,
+                total=12,
+                arqueroFaltante=False,
+            )
 
     async def test_creating_match_with_another_users_team_is_forbidden(self):
         match = self._make_match()
@@ -322,6 +386,7 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
         update_filter = matches.update_one.await_args.args[0]
         self.assertEqual(update_filter["jugadoresInscritos"], {"$ne": "player@example.com"})
         self.assertEqual(update_filter["jugadores"], {"$lt": 3})
+        self.assertEqual(update_filter["estado"], "BUSCANDO JUGADORES")
 
     async def test_successful_join_updates_player_count_and_closes_full_match(self):
         match_id = ObjectId()
@@ -341,13 +406,8 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
             "jugadoresInscritos": ["host@example.com", "player@example.com"],
         }
         matches = SimpleNamespace(
-            find_one=AsyncMock(side_effect=[initial_match, full_match, saved_match]),
-            update_one=AsyncMock(
-                side_effect=[
-                    SimpleNamespace(modified_count=1),
-                    SimpleNamespace(modified_count=1),
-                ]
-            ),
+            find_one=AsyncMock(side_effect=[initial_match, saved_match]),
+            update_one=AsyncMock(return_value=SimpleNamespace(modified_count=1)),
         )
 
         with patch("app.routes.partidos.partidos_col", matches):
@@ -360,6 +420,10 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
         self.assertEqual(result["estado"], "PARTIDO LISTO")
         self.assertEqual(result["jugadores"], 3)
         self.assertIn("player@example.com", result["jugadoresInscritos"])
+        update_pipeline = matches.update_one.await_args.args[1]
+        self.assertEqual(len(update_pipeline), 1)
+        self.assertIn("$setUnion", update_pipeline[0]["$set"]["jugadoresInscritos"])
+        self.assertIn("$cond", update_pipeline[0]["$set"]["estado"])
 
     async def test_challenge_with_another_users_team_is_forbidden(self):
         match_id = ObjectId()
@@ -388,6 +452,88 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
                 )
 
         self.assertEqual(raised.exception.status_code, 403)
+
+    async def test_only_one_team_can_accept_a_rival_challenge(self):
+        match_id = ObjectId()
+        rival_team_id = ObjectId()
+        matches = SimpleNamespace(
+            find_one=AsyncMock(return_value={
+                "_id": match_id,
+                "creadorEmail": "host@example.com",
+                "tipo": "RIVAL",
+                "activo": True,
+                "estado": "BUSCANDO RIVAL",
+                "rival": None,
+            }),
+            update_one=AsyncMock(return_value=SimpleNamespace(modified_count=0)),
+        )
+        teams = SimpleNamespace(find_one=AsyncMock(return_value={
+            "_id": rival_team_id,
+            "nombre": "Retadores",
+        }))
+
+        with (
+            patch("app.routes.partidos.partidos_col", matches),
+            patch("app.routes.partidos.equipos_col", teams),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                await partidos_route.actualizar_partido(
+                    str(match_id),
+                    partidos_route.MatchUpdate(
+                        action="challenge",
+                        rival_team_id=str(rival_team_id),
+                    ),
+                    {"email": "challenger@example.com"},
+                )
+
+        self.assertEqual(raised.exception.status_code, 409)
+        update_filter = matches.update_one.await_args.args[0]
+        self.assertEqual(update_filter["estado"], "BUSCANDO RIVAL")
+        self.assertEqual(update_filter["rival"], None)
+
+    async def test_challenge_winner_is_returned_after_atomic_confirmation(self):
+        match_id = ObjectId()
+        rival_team_id = ObjectId()
+        starting_match = {
+            "_id": match_id,
+            "creadorEmail": "host@example.com",
+            "tipo": "RIVAL",
+            "activo": True,
+            "estado": "BUSCANDO RIVAL",
+            "rival": None,
+            "total": 12,
+        }
+        confirmed_match = {
+            **starting_match,
+            "rival": "Retadores",
+            "estado": "PARTIDO LISTO",
+            "jugadores": 12,
+        }
+        matches = SimpleNamespace(
+            find_one=AsyncMock(side_effect=[starting_match, confirmed_match]),
+            update_one=AsyncMock(return_value=SimpleNamespace(modified_count=1)),
+        )
+        teams = SimpleNamespace(find_one=AsyncMock(return_value={
+            "_id": rival_team_id,
+            "nombre": "Retadores",
+        }))
+
+        with (
+            patch("app.routes.partidos.partidos_col", matches),
+            patch("app.routes.partidos.equipos_col", teams),
+        ):
+            result = await partidos_route.actualizar_partido(
+                str(match_id),
+                partidos_route.MatchUpdate(
+                    action="challenge",
+                    rival_team_id=str(rival_team_id),
+                ),
+                {"email": "challenger@example.com"},
+            )
+
+        self.assertEqual(result["estado"], "PARTIDO LISTO")
+        self.assertEqual(result["rival"], "Retadores")
+        self.assertEqual(matches.update_one.await_args.args[1]["$set"]["estado"], "PARTIDO LISTO")
 
     async def test_only_match_owner_can_cancel_match(self):
         match_id = ObjectId()
@@ -427,6 +573,6 @@ class MatchCreationIdempotencyTests(IsolatedAsyncioTestCase):
 
         self.assertEqual(result["msg"], "Partido cancelado")
         matches.update_one.assert_awaited_once_with(
-            {"_id": match_id},
+            {"_id": match_id, "activo": {"$ne": False}},
             {"$set": {"activo": False, "estado": "CANCELADO"}},
         )

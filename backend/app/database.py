@@ -1,8 +1,11 @@
+import logging
+
 from pymongo import AsyncMongoClient
 from pymongo.errors import PyMongoError
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
 
 client = AsyncMongoClient(
     settings.mongo_url,
@@ -32,4 +35,5 @@ async def ping_db():
         await client.admin.command("ping")
         return True
     except PyMongoError:
+        logger.exception("database.health_check.failed", extra={"event": "database.health_check.failed"})
         return False

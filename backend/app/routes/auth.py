@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException, Response, status
 from google.auth.exceptions import TransportError
@@ -12,6 +13,7 @@ from app.database import format_mongo_doc, usuarios_col
 from app.security import create_access_token
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
+logger = logging.getLogger(__name__)
 
 
 class GoogleLoginRequest(BaseModel):
@@ -72,23 +74,53 @@ async def login_google(payload: GoogleLoginRequest, response: Response):
 
     try:
         try:
-            await usuarios_col.update_one({"email": email}, update, upsert=True)
+            persistence_result = await usuarios_col.update_one(
+                {"email": email},
+                update,
+                upsert=True,
+            )
         except DuplicateKeyError:
             # Concurrent first logins can race against the unique email index.
-            await usuarios_col.update_one({"email": email}, update)
+            persistence_result = await usuarios_col.update_one({"email": email}, update)
 
         user = await usuarios_col.find_one({"email": email})
     except PyMongoError as exc:
+        logger.exception(
+            "auth.login.database_error",
+            extra={"event": "auth.login.database_error"},
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not persist the user",
         ) from exc
 
     if user is None:
+        logger.error(
+            "auth.login.persisted_user_missing",
+            extra={"event": "auth.login.persisted_user_missing"},
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not load the persisted user",
         )
+
+    if persistence_result.upserted_id is not None:
+        logger.info(
+            "auth.user.created",
+            extra={
+                "event": "auth.user.created",
+                "entity_type": "user",
+                "entity_id": str(persistence_result.upserted_id),
+            },
+        )
+    logger.info(
+        "auth.login.succeeded",
+        extra={
+            "event": "auth.login.succeeded",
+            "entity_type": "user",
+            "entity_id": str(user["_id"]),
+        },
+    )
 
     return {
         "user": format_mongo_doc(user),

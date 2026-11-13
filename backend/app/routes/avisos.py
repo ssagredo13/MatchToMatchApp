@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta, timezone
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pymongo.errors import PyMongoError
@@ -8,6 +9,7 @@ from app.models import AvisoCreate
 from app.security import get_current_user
 
 router = APIRouter(prefix="/api/avisos", tags=["Avisos"])
+logger = logging.getLogger(__name__)
 
 
 def _format_notice(aviso: dict, current_email: str) -> dict:
@@ -54,11 +56,23 @@ async def crear_aviso(
     try:
         result = await avisos_col.insert_one(aviso_data)
     except PyMongoError as exc:
+        logger.exception(
+            "notice.create.database_error",
+            extra={"event": "notice.create.database_error"},
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="No se pudo publicar el aviso. Intenta nuevamente.",
         ) from exc
 
+    logger.info(
+        "notice.created",
+        extra={
+            "event": "notice.created",
+            "entity_type": "notice",
+            "entity_id": str(result.inserted_id),
+        },
+    )
     return _format_notice({"_id": result.inserted_id, **aviso_data}, current_user["email"])
 
 
@@ -82,13 +96,26 @@ async def cancelar_aviso(
         )
 
     try:
-        await avisos_col.update_one(
+        result = await avisos_col.update_one(
             {"_id": ObjectId(aviso_id), "activo": True},
             {"$set": {"activo": False}},
         )
     except PyMongoError as exc:
+        logger.exception(
+            "notice.cancel.database_error",
+            extra={"event": "notice.cancel.database_error", "entity_type": "notice"},
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="No se pudo cancelar el aviso. Intenta nuevamente.",
         ) from exc
+    if result.modified_count:
+        logger.info(
+            "notice.cancelled",
+            extra={
+                "event": "notice.cancelled",
+                "entity_type": "notice",
+                "entity_id": aviso_id,
+            },
+        )
     return {"msg": "Aviso cancelado"}

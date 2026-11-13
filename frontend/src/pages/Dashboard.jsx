@@ -15,8 +15,10 @@ const Dashboard = ({ user }) => {
   const [misEquipos, setMisEquipos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+  const [isUpdatingMatch, setIsUpdatingMatch] = useState(false);
   const [loadError, setLoadError] = useState('');
   const matchCreationRef = useRef({ inFlight: false, fingerprint: '', key: '' });
+  const matchUpdateInFlightRef = useRef(false);
   
   const [filtro, setFiltro] = useState('TODOS');
   const [modalType, setModalType] = useState(null); 
@@ -106,6 +108,9 @@ const Dashboard = ({ user }) => {
       lng: parseFloat(formPartida.lng),
       hora: formPartida.hora,
       fecha: formPartida.fecha,
+      timezoneOffsetMinutes: -new Date(
+        `${formPartida.fecha}T${formPartida.hora}:00`,
+      ).getTimezoneOffset(),
       tipo: formPartida.tipo,
       jugadores: iniciales, 
       total: totalCupos,
@@ -155,6 +160,9 @@ const Dashboard = ({ user }) => {
   };
 
   const handleUnirseMatch = async (pId, mode, equipoData = null) => {
+    if (matchUpdateInFlightRef.current) return;
+    matchUpdateInFlightRef.current = true;
+    setIsUpdatingMatch(true);
     try {
       const payload = mode === 'PLAYER'
         ? { action: 'join' }
@@ -169,6 +177,9 @@ const Dashboard = ({ user }) => {
       setLoadError('');
     } catch (error) {
       setLoadError(error.message || 'No se pudo actualizar la partida.');
+    } finally {
+      matchUpdateInFlightRef.current = false;
+      setIsUpdatingMatch(false);
     }
   };
 
@@ -215,6 +226,7 @@ const Dashboard = ({ user }) => {
     misEquipos, step, setStep, formPartida, setFormPartida,
     handleCrearPartida, nuevoEquipo, setNuevoEquipo,
     isCreatingMatch,
+    isUpdatingMatch,
     recintosOficiales, handleCrearEquipoDB: async (n) => {
         try {
           const creado = await apiFetch('/api/equipos', {

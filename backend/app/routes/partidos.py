@@ -1,4 +1,6 @@
 import hashlib
+import logging
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
 from bson import ObjectId
@@ -12,6 +14,7 @@ from app.security import get_current_user
 
 router = APIRouter(prefix="/api/partidos", tags=["Partidos"])
 IDEMPOTENCY_FIELDS = {"idempotencyKey", "idempotencyPayloadHash"}
+logger = logging.getLogger(__name__)
 
 
 def _format_public_match(partido: dict) -> dict:
@@ -51,7 +54,7 @@ async def listar_partidos(
     return partidos
 
 
-@router.post("/")
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def crear_partido(
     partido: PartidoCreate,
     current_user: dict = Depends(get_current_user),
@@ -76,6 +79,14 @@ async def crear_partido(
             "idempotencyKey": idempotency_key,
         })
         if existing:
+            logger.info(
+                "match.create.idempotent_replay",
+                extra={
+                    "event": "match.create.idempotent_replay",
+                    "entity_type": "match",
+                    "entity_id": str(existing["_id"]),
+                },
+            )
             return _get_existing_idempotent_match(existing, payload_hash)
 
     equipo = await equipos_col.find_one({
@@ -86,6 +97,11 @@ async def crear_partido(
         raise HTTPException(status_code=403, detail="No puedes organizar con un equipo que no te pertenece")
 
     partido_data = partido.model_dump()
+    partido_data["scheduledAt"] = datetime.combine(
+        date.fromisoformat(partido.fecha),
+        time.fromisoformat(partido.hora),
+        tzinfo=timezone(timedelta(minutes=-partido.timezoneOffsetMinutes)),
+    ).astimezone(timezone.utc)
     partido_data.update({
         "equipo": equipo["nombre"],
         "creadorEmail": current_user["email"],
@@ -112,17 +128,33 @@ async def crear_partido(
             "idempotencyKey": idempotency_key,
         })
         if not existing:
+            logger.exception(
+                "match.create.idempotency_conflict_unresolved",
+                extra={"event": "match.create.idempotency_conflict_unresolved"},
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Could not confirm whether the match was saved",
             ) from exc
         return _get_existing_idempotent_match(existing, payload_hash)
     except PyMongoError as exc:
+        logger.exception(
+            "match.create.database_error",
+            extra={"event": "match.create.database_error"},
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not save the match",
         ) from exc
 
+    logger.info(
+        "match.created",
+        extra={
+            "event": "match.created",
+            "entity_type": "match",
+            "entity_id": str(result.inserted_id),
+        },
+    )
     return _format_public_match({"_id": result.inserted_id, **partido_data})
 
 
@@ -142,9 +174,27 @@ async def cancelar_partido(partido_id: str, current_user: dict = Depends(get_cur
     if partido.get("creadorEmail") != current_user["email"] and not is_admin:
         raise HTTPException(status_code=403, detail="No tienes permiso para cancelar este partido")
 
-    await partidos_col.update_one(
-        {"_id": ObjectId(partido_id)},
-        {"$set": {"activo": False, "estado": "CANCELADO"}},
+    try:
+        await partidos_col.update_one(
+            {"_id": ObjectId(partido_id), "activo": {"$ne": False}},
+            {"$set": {"activo": False, "estado": "CANCELADO"}},
+        )
+    except PyMongoError as exc:
+        logger.exception(
+            "match.cancel.database_error",
+            extra={"event": "match.cancel.database_error", "entity_type": "match"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo cancelar el partido. Intenta nuevamente.",
+        ) from exc
+    logger.info(
+        "match.cancelled",
+        extra={
+            "event": "match.cancelled",
+            "entity_type": "match",
+            "entity_id": partido_id,
+        },
     )
     return {"msg": "Partido cancelado"}
 
@@ -181,15 +231,43 @@ async def actualizar_partido(
             if not rival_team:
                 raise HTTPException(status_code=403, detail="No puedes usar un equipo que no te pertenece")
 
-            await partidos_col.update_one(
-                {"_id": object_id, "estado": {"$ne": "PARTIDO LISTO"}},
+            result = await partidos_col.update_one(
+                {
+                    "_id": object_id,
+                    "activo": {"$ne": False},
+                    "estado": "BUSCANDO RIVAL",
+                    "rival": None,
+                },
                 {"$set": {
                     "rival": rival_team["nombre"],
                     "estado": "PARTIDO LISTO",
                     "jugadores": partido.get("total", 12),
                 }},
             )
+            if result.modified_count == 0:
+                logger.warning(
+                    "match.challenge.conflict",
+                    extra={
+                        "event": "match.challenge.conflict",
+                        "entity_type": "match",
+                        "entity_id": partido_id,
+                    },
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail="El desafío ya fue aceptado o dejó de estar disponible",
+                )
+            logger.info(
+                "match.challenge.accepted",
+                extra={
+                    "event": "match.challenge.accepted",
+                    "entity_type": "match",
+                    "entity_id": partido_id,
+                },
+            )
         else:
+            if partido.get("tipo") != "JUGADORES":
+                raise HTTPException(status_code=400, detail="Este partido no acepta jugadores individuales")
             if partido.get("creadorEmail") == current_user["email"]:
                 raise HTTPException(status_code=400, detail="No puedes sumarte a tu propio partido")
 
@@ -197,30 +275,65 @@ async def actualizar_partido(
                 {
                     "_id": object_id,
                     "activo": {"$ne": False},
-                    "estado": {"$ne": "PARTIDO LISTO"},
+                    "estado": "BUSCANDO JUGADORES",
                     "jugadores": {"$lt": partido.get("total", 12)},
                     "jugadoresInscritos": {"$ne": current_user["email"]},
                 },
-                {
-                    "$addToSet": {"jugadoresInscritos": current_user["email"]},
-                    "$inc": {"jugadores": 1},
-                },
+                [{
+                    "$set": {
+                        "jugadoresInscritos": {
+                            "$setUnion": [
+                                {"$ifNull": ["$jugadoresInscritos", []]},
+                                [current_user["email"]],
+                            ],
+                        },
+                        "jugadores": {
+                            "$add": [{"$ifNull": ["$jugadores", 0]}, 1],
+                        },
+                        "estado": {
+                            "$cond": [
+                                {
+                                    "$gte": [
+                                        {"$add": [{"$ifNull": ["$jugadores", 0]}, 1]},
+                                        {"$ifNull": ["$total", 12]},
+                                    ],
+                                },
+                                "PARTIDO LISTO",
+                                {"$ifNull": ["$estado", "BUSCANDO JUGADORES"]},
+                            ],
+                        },
+                    },
+                }],
             )
             if result.modified_count == 0:
+                logger.warning(
+                    "match.join.conflict",
+                    extra={
+                        "event": "match.join.conflict",
+                        "entity_type": "match",
+                        "entity_id": partido_id,
+                    },
+                )
                 raise HTTPException(
                     status_code=409,
                     detail="El partido está lleno, cerrado o ya estás inscrito",
                 )
 
-            updated = await partidos_col.find_one({"_id": object_id})
-            if updated and updated.get("jugadores", 0) >= updated.get("total", 12):
-                await partidos_col.update_one(
-                    {"_id": object_id, "estado": {"$ne": "PARTIDO LISTO"}},
-                    {"$set": {"estado": "PARTIDO LISTO"}},
-                )
+            logger.info(
+                "match.player.joined",
+                extra={
+                    "event": "match.player.joined",
+                    "entity_type": "match",
+                    "entity_id": partido_id,
+                },
+            )
 
         updated_partido = await partidos_col.find_one({"_id": object_id})
     except PyMongoError as exc:
+        logger.exception(
+            "match.update.database_error",
+            extra={"event": "match.update.database_error", "entity_type": "match"},
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not update the match",

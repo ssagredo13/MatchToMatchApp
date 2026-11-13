@@ -8,6 +8,7 @@ const MatchModals = ({
   misEquipos, step, setStep, formPartida, setFormPartida, 
   handleCrearPartida, nuevoEquipo, setNuevoEquipo, errorMessage,
   handleCrearEquipoDB, isCreatingMatch = false,
+  isUpdatingMatch = false,
 }) => {
   
   const [isCreating, setIsCreating] = useState(false);
@@ -52,13 +53,16 @@ const MatchModals = ({
               {selectedPartido.tipo === 'JUGADORES' ? (
                 <button 
                   onClick={() => handleUnirseMatch(getEntityId(selectedPartido), 'PLAYER')} 
+                  disabled={isUpdatingMatch}
                   className="w-full bg-white/5 border border-white/5 p-8 rounded-[32px] flex items-center gap-6 hover:bg-[#ccff00]/10 hover:border-[#ccff00] transition-all group text-left"
                 >
                   <div className="bg-[#ccff00] p-4 rounded-2xl text-black shadow-lg shadow-[#ccff00]/20 group-hover:scale-110 transition-transform">
                     <UserPlus size={28} strokeWidth={3}/>
                   </div>
                   <div>
-                    <p className="font-black italic uppercase text-xl tracking-tight">Sumarme a la pichanga</p>
+                    <p className="font-black italic uppercase text-xl tracking-tight">
+                      {isUpdatingMatch ? 'Confirmando cupo…' : 'Sumarme a la pichanga'}
+                    </p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Como jugador individual</p>
                   </div>
                 </button>
@@ -76,19 +80,21 @@ const MatchModals = ({
                       return (
                         <button 
                           key={teamId} 
-                          disabled={isSameTeam}
+                          disabled={isSameTeam || isUpdatingMatch}
                           onClick={() => handleUnirseMatch(getEntityId(selectedPartido), 'TEAM', me)} 
                           className={`w-full p-6 rounded-[28px] flex items-center justify-between transition-all group border
                             ${isSameTeam 
                               ? 'bg-white/5 border-white/5 opacity-40 cursor-not-allowed' 
-                              : 'bg-white/5 border-white/5 hover:border-orange-500 hover:bg-orange-500/5'}`}
+                              : 'bg-white/5 border-white/5 hover:border-orange-500 hover:bg-orange-500/5 disabled:cursor-wait disabled:opacity-60'}`}
                         >
                           <div className="flex items-center gap-5">
                             <div className={`p-3 rounded-xl transition-all ${isSameTeam ? 'bg-slate-800' : 'bg-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-black'}`}>
                               <Swords size={24}/>
                             </div>
                             <div className="text-left">
-                              <p className="font-black italic uppercase text-lg leading-none">{me.nombre}</p>
+                              <p className="font-black italic uppercase text-lg leading-none">
+                                {isUpdatingMatch ? 'Confirmando desafío…' : me.nombre}
+                              </p>
                               {isSameTeam && <p className="text-[9px] font-bold text-orange-500 mt-1 uppercase">Tu equipo ya es el host</p>}
                             </div>
                           </div>
@@ -138,7 +144,9 @@ const MatchModals = ({
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic px-1">Fecha</label>
                     <input 
+                      required
                       type="date" 
+                      min={new Date().toLocaleDateString('en-CA')}
                       value={formPartida.fecha}
                       onChange={(e) => setFormPartida({...formPartida, fecha: e.target.value})}
                       className="w-full bg-white/5 border border-white/10 h-14 px-5 rounded-2xl text-white outline-none focus:border-[#ccff00] font-bold uppercase transition-all [color-scheme:dark]"
@@ -147,6 +155,7 @@ const MatchModals = ({
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic px-1">Hora</label>
                     <input 
+                      required
                       type="time" 
                       value={formPartida.hora}
                       onChange={(e) => setFormPartida({...formPartida, hora: e.target.value})}

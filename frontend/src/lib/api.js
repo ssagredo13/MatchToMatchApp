@@ -70,7 +70,11 @@ export async function apiFetch(path, options = {}, { authenticated = true } = {}
       window.dispatchEvent(new Event('session-expired'));
     }
     const detail = responseData?.detail;
-    const message = typeof detail === 'string' ? detail : `Error del servidor (${response.status}).`;
+    let message = typeof detail === 'string' ? detail : `Error del servidor (${response.status}).`;
+    const requestId = response.headers.get('X-Request-ID') || responseData?.request_id;
+    if (response.status >= 500 && requestId) {
+      message = `${message} Referencia de soporte: ${requestId}`;
+    }
     throw new Error(message);
   }
 
