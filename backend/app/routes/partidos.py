@@ -24,6 +24,29 @@ def _format_public_match(partido: dict) -> dict:
     return format_mongo_doc(public_partido)
 
 
+def _partido_datetime(fecha: str, hora: str) -> datetime:
+    return datetime.combine(
+        date.fromisoformat(fecha),
+        time.fromisoformat(hora),
+    )
+
+
+def _horarios_solapan(
+    f1: str, h1: str, d1: int,
+    f2: str, h2: str, d2: int,
+    margen_min: int = 15,
+) -> bool:
+    inicio1 = _partido_datetime(f1, h1)
+    fin1 = inicio1 + timedelta(minutes=d1)
+    inicio2 = _partido_datetime(f2, h2)
+    fin2 = inicio2 + timedelta(minutes=d2)
+    inicio1_m = inicio1 - timedelta(minutes=margen_min)
+    fin1_m = fin1 + timedelta(minutes=margen_min)
+    inicio2_m = inicio2 - timedelta(minutes=margen_min)
+    fin2_m = fin2 + timedelta(minutes=margen_min)
+    return inicio1_m < fin2_m and inicio2_m < fin1_m
+
+
 def _get_existing_idempotent_match(partido: dict, payload_hash: str) -> dict:
     if partido.get("idempotencyPayloadHash") != payload_hash:
         raise HTTPException(
@@ -110,7 +133,31 @@ async def crear_partido(
         "estado": "BUSCANDO RIVAL" if partido.tipo == "RIVAL" else "BUSCANDO JUGADORES",
         "activo": True,
         "rival": None,
+        "duracion_minutos": partido.duracion_minutos,
     })
+    # --- Regla: misma cancha no puede tener dos partidos que se crucen ---
+    async for existente in partidos_col.find({
+        "recinto": partido.recinto,
+        "estado": {"$ne": "CANCELADO"},
+        "fecha": partido.fecha,
+    }):
+        if _horarios_solapan(
+            partido.fecha, partido.hora, partido.duracion_minutos,
+            existente["fecha"], existente["hora"],
+            existente.get("duracion_minutos", 60),
+        ):
+            logger.warning(
+                "match.create.overlap_conflict",
+                extra={
+                    "event": "match.create.overlap_conflict",
+                    "entity_type": "match",
+                    "entity_id": str(existente.get("_id", "")),
+                },
+            )
+            raise HTTPException(
+                status_code=409,
+                detail="Ya existe un partido en este recinto que se cruza en horario",
+            )
     if idempotency_key is not None:
         partido_data["idempotencyKey"] = idempotency_key
         partido_data["idempotencyPayloadHash"] = payload_hash
@@ -270,6 +317,33 @@ async def actualizar_partido(
                 raise HTTPException(status_code=400, detail="Este partido no acepta jugadores individuales")
             if partido.get("creadorEmail") == current_user["email"]:
                 raise HTTPException(status_code=400, detail="No puedes sumarte a tu propio partido")
+
+            # --- Regla: mismo jugador no puede tener partidos que se crucen ---
+            usuario_email = current_user["email"]
+            async for pu in partidos_col.find({
+                "$or": [
+                    {"creadorEmail": usuario_email},
+                    {"jugadoresInscritos": usuario_email},
+                ],
+                "estado": {"$ne": "CANCELADO"},
+                "_id": {"$ne": object_id},
+            }):
+                if _horarios_solapan(
+                    partido["fecha"], partido["hora"], partido.get("duracion_minutos", 60),
+                    pu["fecha"], pu["hora"], pu.get("duracion_minutos", 60),
+                ):
+                    logger.warning(
+                        "match.join.overlap_conflict",
+                        extra={
+                            "event": "match.join.overlap_conflict",
+                            "entity_type": "match",
+                            "entity_id": partido_id,
+                        },
+                    )
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Ya tienes un partido que se cruza en este horario",
+                    )
 
             result = await partidos_col.update_one(
                 {

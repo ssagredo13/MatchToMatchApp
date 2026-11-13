@@ -24,6 +24,7 @@ class PartidoCreate(BaseModel):
     jugadores: int = Field(ge=1)
     total: int = Field(ge=2, le=50)
     arqueroFaltante: bool
+    duracion_minutos: int = Field(default=60, ge=30, le=180)
 
     @field_validator("fecha")
     @classmethod
